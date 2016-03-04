@@ -5,4 +5,5 @@ llvm/*
 whole-program-llvm/*
 .project
 .cproject
-
+cscope.out
+tags
