@@ -62,7 +62,11 @@ testfs_make_inode_blocks(struct super_block *sb)
         zero_blocks(sb, sb->sb.inode_blocks_start, NR_INODE_BLOCKS);
 }
 
-/* returns negative value on error */
+/* returns negative value on error 
+ file is name of the disk that was given to testfs.
+this function initializes all the in memory data structures maintained by the sb 
+block.
+*/
 int
 testfs_init_super_block(const char *file, int corrupt, struct super_block **sbp)
 {
@@ -85,13 +89,26 @@ testfs_init_super_block(const char *file, int corrupt, struct super_block **sbp)
             return errno;
         }	
 
+	// sb->dev type = FILE
+	// read from sb into block.
         read_blocks(sb, block, 0, 1);
+	// copy only 24 bytes from block corresponding to dsuper_block
         memcpy(&sb->sb, block, sizeof(struct dsuper_block));
 
+	// 64 * 1 * 8
+	// bitmap create will return a inode_bitmap structure.
+	// and point sb->inode_freemap to that structure.
+	// currently the inode bitmap is all 0.
+	// at the end of this function, bitmap is created in memory 
         ret = bitmap_create(BLOCK_SIZE * INODE_FREEMAP_SIZE * BITS_PER_WORD,
                             &sb->inode_freemap);
         if (ret < 0)
                 return ret;
+	// bitmap_getdata returns v -> the byte array containing bit info
+	// read_blocks reads sb->v into sb at offset freemap_start till 
+	// INODE_FREEMAP_SIZE
+	// sb is only sent to read_blocks since we need the sb device handle.
+	// data from sb->dev is used to populate arg 2  sb->inode_freemap
         read_blocks(sb, bitmap_getdata(sb->inode_freemap), 
                     sb->sb.inode_freemap_start, INODE_FREEMAP_SIZE);
 
@@ -107,12 +124,21 @@ testfs_init_super_block(const char *file, int corrupt, struct super_block **sbp)
         read_blocks(sb, (char *)sb->csum_table, sb->sb.csum_table_start, 
                     CSUM_TABLE_SIZE);
         sb->tx_in_progress = TX_NONE;
+	/*
+		inode_hash_init() initializes inode_hash_table of size 256 bytes
+		each entry of the inode table contains a first pointer. each 
+		node of the first pointer has a prev pointer and a next pointer.
+	*/
         inode_hash_init();
         *sbp = sb;
         
         return 0;
 }
 
+/*
+* from in memory data structure sb, copy dsuper_block
+* into buffer block. then send it for writing to write_blocks
+*/
 void
 testfs_write_super_block(struct super_block *sb)
 {
@@ -127,17 +153,24 @@ void
 testfs_close_super_block(struct super_block *sb)
 {
         testfs_tx_start(sb, TX_UMOUNT);
+	// write sb->sb of type dsuper_block to disk at offset 0.
         testfs_write_super_block(sb);
+	// assume there are no entries in the inode hash table. 
+	// delete the 256 hash size inode hash table 
         inode_hash_destroy();
         if (sb->inode_freemap) {
+		// write inode map to disk.
                 write_blocks(sb, bitmap_getdata(sb->inode_freemap), 
                              sb->sb.inode_freemap_start, INODE_FREEMAP_SIZE);
+		// free in memory bitmap file.
                 bitmap_destroy(sb->inode_freemap);
                 sb->inode_freemap = NULL;
         }
         if (sb->block_freemap) {
+		// write inode freemap to disk
                 write_blocks(sb, bitmap_getdata(sb->block_freemap), 
                              sb->sb.block_freemap_start, BLOCK_FREEMAP_SIZE);
+		// destroy inode freemap
                 bitmap_destroy(sb->block_freemap);
                 sb->block_freemap = NULL;
         }
@@ -145,6 +178,7 @@ testfs_close_super_block(struct super_block *sb)
         fflush(sb->dev);
         fclose(sb->dev);
         sb->dev = NULL;
+	// free in memory data structure sb superblock
         free(sb);
 }
 
@@ -230,6 +264,7 @@ testfs_alloc_block(struct super_block *sb, char *block)
         int phy_block_nr;
 
         phy_block_nr = testfs_get_block_freemap(sb);
+	// if error occured, return -ENOSPC
         if (phy_block_nr < 0)
                 return phy_block_nr;
         bzero(block, BLOCK_SIZE);

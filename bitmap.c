@@ -24,12 +24,17 @@ struct bitmap {
 };
 
 /* return negative value on error */
+// takes nbits as argument, rounds it off to nearest WORD_TYPE = 8 bits.
+// zeroes the trailing bits, initializes bp with the struct bitmap -
+// which contains no of actual bits (minus the trailing bits)
+// and a char array containing all bit information 
 int
 bitmap_create(u_int32_t nbits, struct bitmap **bp)
 {
 	struct bitmap *b; 
 	u_int32_t words;
 
+	// round up nbits up to 8 BITS_PER_WORD = 8
 	words = DIVROUNDUP(nbits, BITS_PER_WORD);
 	b = malloc(sizeof(struct bitmap));
 	if (b == NULL) {

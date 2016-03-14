@@ -54,6 +54,9 @@ cmd_quit(struct super_block *sb, struct context *c)
         can_quit = true;
         return 0;
 }
+
+// tokenize the command, place it in the form of cmd, arg1, arg2 ... in
+// context c->cmd[] structure. pass c and superblock sb to cmdtable->func
 	
 static void
 handle_command(struct super_block *sb, struct context *c, char * name,
@@ -68,7 +71,8 @@ handle_command(struct super_block *sb, struct context *c, char * name,
                         char * token = args;
                         assert(cmdtable[i].func);
                         
-                        c->cmd[j++] = name;
+                        c->cmd[j++] = name;	// context->cmd contains 
+						// command arguments
                         while (j < cmdtable[i].max_args &&
                                (c->cmd[j] = strtok(token, " \t\n")) != NULL) {
                                 j++; 
@@ -109,6 +113,12 @@ static struct args *
 parse_arguments(int argc, char * const argv[])
 {
     static struct args args = { 0 };
+// struct options -
+// name of the option. 
+// has arg {no_argument, required_argument, optional_argument}
+// flag ptr - 0 means val is the value that identifies this option
+// flag ptr - non null - address of int variable which is flag for the option
+// val - c or h
     static struct option long_options[] =
     {
         {"corrupt", no_argument,       0, 'c'},
@@ -120,6 +130,9 @@ parse_arguments(int argc, char * const argv[])
     while (running)
     {
         int option_index = 0;
+	// getopt_long - decode options from argv.
+	// getopt_long (int argc, char *const *argv, const char *shortopts, const struct option *longopts, int *indexptr)
+	// 
         int c = getopt_long (argc, argv, "ch", long_options, &option_index);
         switch (c)
         {
@@ -141,7 +154,7 @@ parse_arguments(int argc, char * const argv[])
             abort();
         }
     }
-    
+	// optind - index of next variable to be processed in argv.    
     if ( argc - optind != 1 )
         usage(argv[0]);
         
@@ -158,12 +171,24 @@ main(int argc, char * const argv[])
         ssize_t nr;
         int ret;
         struct context c;
+ 	// context contains command line arguments/parameters, 
+	// inode of directory from which cmd was issued, and no of args.
+
         struct args * args = parse_arguments(argc, argv);
-        
+       
+	// args->disk contains the name of the disk file. 
+	// initializes the in memory structure sb with data that is 
+	// read from the disk. after successful execution, we have 
+	// sb initialized to dsuper_block read from disk.
         ret = testfs_init_super_block(args->disk,args-> corrupt, &sb);
         if (ret) {
             EXIT("testfs_init_super_block");
         }
+	/* if the inode does not exist in the inode_hash_map (which
+	is an inmemory map of all inode blocks, create a new inode by
+	allocating memory to it. read the dinode from disk into that
+	memory inode
+	*/
         c.cur_dir = testfs_get_inode(sb, 0); /* root dir */
         for (;	
             PROMPT, 
@@ -182,6 +207,8 @@ main(int argc, char * const argv[])
         }
         
         free(line);
+	// decrement inode count by 1. remove inode from in_memory hash map if
+	// inode count has become 0.
         testfs_put_inode(c.cur_dir);
         testfs_close_super_block(sb);
         return 0;

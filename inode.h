@@ -9,6 +9,8 @@ typedef enum {I_NONE, I_FILE, I_DIR} inode_type;
 #define NR_DIRECT_BLOCKS 4
 #define NR_INDIRECT_BLOCKS (BLOCK_SIZE/sizeof(int))
 
+// dinode - inode maintained on disk
+
 struct dinode {
         inode_type i_type;                      /* 0x00 */
         int i_size;                             /* 0x04 */

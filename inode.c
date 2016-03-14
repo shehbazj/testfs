@@ -32,7 +32,7 @@ void
 inode_hash_init(void)
 {
         int i;
-
+	// hash table is of size 256 bytes
         inode_hash_table = malloc(inode_hash_size * sizeof(struct hlist_head));
         if (!inode_hash_table) {
                 EXIT("malloc");
@@ -82,6 +82,13 @@ inode_hash_remove(struct inode *in)
         hlist_del(&in->hnode);
 }
 
+/*
+	Blocks are maintained both on disk and in memory.
+	the inode structure that is represented on disk is called
+	a dinode. the INODES_PER_BLOCK is computed by calculating
+	the BLOCK_SIZE / dinode size.
+*/
+
 static int
 testfs_inode_to_block_nr(struct inode *in)
 {
@@ -105,6 +112,7 @@ static void
 testfs_read_inode_block(struct inode *in, char *block)
 {
         int block_nr = testfs_inode_to_block_nr(in);
+	// read from in->sb into block buffer.
         read_blocks(in->sb, block, in->sb->sb.inode_blocks_start + block_nr, 1);
 }
 
@@ -120,6 +128,9 @@ testfs_write_inode_block(struct inode *in, char *block)
  * return physical block number.
  * returns 0 if physical block does not exist.
  * returns negative value on other errors. */
+
+// also reads the block into block buffer.
+
 static int
 testfs_get_block(struct inode *in, char *block, int log_block_nr)
 {
@@ -150,34 +161,61 @@ testfs_allocate_block(struct inode *in, char *block, int log_block_nr)
         int phy_block_nr;
 
         assert(log_block_nr >= 0);
+	// this reads log_block_nr inside block buffer, and returns
+	// the phy_block_nr corresponding to the block.
         phy_block_nr = testfs_get_block(in, block, log_block_nr);
+	// successfully obtained a physical block.
         if (phy_block_nr != 0)
                 return phy_block_nr;
+	// otherwise we will need to alocate a new physical block
         if (log_block_nr < NR_DIRECT_BLOCKS) {
+		// initializes block buffer with 0.
+		// uses in->sb to allocate block in block freemap
                 phy_block_nr = testfs_alloc_block(in->sb, block);
+		// error in allocating block in freemap, return 
+		// -ENOSPC
                 if (phy_block_nr < 0)
                         return phy_block_nr;
+		// make logical-physical block number mapping
                 in->in.i_block_nr[log_block_nr] = phy_block_nr;
                 in->i_flags |= I_FLAGS_DIRTY;
                 return phy_block_nr;
         }
         log_block_nr -= NR_DIRECT_BLOCKS;
         assert(log_block_nr < NR_INDIRECT_BLOCKS);
+	// if there are no indirect blocks, assign a new inode
+	// and point indirect block pointer to that newly created
+	// block.
         if (in->in.i_indirect == 0) {
+		// indirect is the temporary char block we take here
                 phy_block_nr = testfs_alloc_block(in->sb, indirect);
                 if (phy_block_nr < 0)
                         return phy_block_nr;
                 in->in.i_indirect = phy_block_nr;
                 in->i_flags |= I_FLAGS_DIRTY;
         } else {
+	// if we already have an indirect block, then we read the 
+	// indirect block into the indirect buffer.
                 read_blocks(in->sb, indirect, in->in.i_indirect, 1);
         }
+	// allocate a new block and make logical to physical block mapping
         phy_block_nr = testfs_alloc_block(in->sb, block);
         if (phy_block_nr > 0)
                 ((int *)indirect)[log_block_nr] = phy_block_nr;
+	// write the indirect buffer to disk
         write_blocks(in->sb, indirect, in->in.i_indirect, 1);
         return phy_block_nr;
 }
+
+/*
+ inode already exists on disk. but it may or may not exist in memory.
+If the inode does not exist in memory, create one
+
+ search for an inode corresponding to inode_nr in the hast table, if found,
+increment reference count and return inode back.
+ if did not find, allocate new inode in memory, make count 1, assign inode number
+ read the inode from the 
+*/
 
 struct inode *
 testfs_get_inode(struct super_block *sb, int inode_nr)
@@ -198,9 +236,17 @@ testfs_get_inode(struct super_block *sb, int inode_nr)
         in->i_nr = inode_nr;
         in->sb = sb;
         in->i_count = 1;
+	// read from disk into block in-memory buffer. 
+	// the in structure has sb sub-structure that has link to drive name.
+	// this drive name is used to read data.
+	// in next few instructions, we will read the 
+	// dinode contents from block buffer later into in->in structure.
         testfs_read_inode_block(in, block);
         block_offset = testfs_inode_to_block_offset(in);
+	// copy inode disk contents from block+block_offset 
+	// into sb->in structure
         memcpy(&in->in, block + block_offset, sizeof(struct dinode));
+	// insert in into in memory hash map
         inode_hash_insert(in);
         return in;
 }
@@ -263,6 +309,8 @@ testfs_create_inode(struct super_block *sb, inode_type type, struct inode **inp)
         if (inode_nr < 0) {
                 return inode_nr;
         }
+	// since the inode number does not exist already, this 
+	// call will lead to creation of a new inode
         in = testfs_get_inode(sb, inode_nr);
         in->in.i_type = type;
         in->i_flags |= I_FLAGS_DIRTY;
@@ -294,19 +342,27 @@ testfs_read_data(struct inode *in, int start, char *buf, const int size)
         int done = 0;
         
         assert(buf);
+	// start offset to read from and size of data to read from the inode
+	// should be less than the actual zie of the inode
         assert((start + size) <= in->in.i_size);
         do {
                 int block_nr = (start + buf_offset)/BLOCK_SIZE;
                 int copy_size;
-
+	
+		// reads inode block to block buffer. returns 
+		// physical block number 
                 block_nr = testfs_get_block(in, block, block_nr);
                 if (block_nr < 0)
                         return block_nr;
                 assert(block_nr > 0);
                 if ((size - buf_offset) <= (BLOCK_SIZE - b_offset)) {
+		// reading the last block from inode file
                         copy_size = size - buf_offset;
                         done = 1;
                 } else {
+		// reading the first/intermediate block from inode file.
+		// at first b_offset may be a non BLOCK_SIZE aligned value
+		// later it becomes an aligned value (b_offset = 0) 
                         copy_size = BLOCK_SIZE - b_offset;
                 }
                 memcpy(buf + buf_offset, block + b_offset, copy_size);

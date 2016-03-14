@@ -4,6 +4,10 @@
 
 static char zero[BLOCK_SIZE] = {0};
 
+/*
+* write buffer blocks to disk.
+*/
+
 void
 write_blocks(struct super_block *sb, char *blocks, int start, int nr)
 {
@@ -35,6 +39,12 @@ zero_blocks(struct super_block *sb, int start, int nr)
                 write_blocks(sb, zero, start + i, 1);
         }
 }
+
+/*
+	read 'nr' number of blocks from start offset, place them in blocks.
+	reset the sb->dev block pointer to the original position.
+	you need sb only for the device handle name, stored in sb->dev
+*/
 
 void
 read_blocks(struct super_block *sb, char *blocks, int start, int nr)
