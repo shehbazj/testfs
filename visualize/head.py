@@ -15,10 +15,10 @@ class Base(object):
   def Label(self):
     return "n{}".format(id(self))
 
-  def PrintByteSources(self, next, edges):
-    for i, s in self.byte_sources.items():
+  def PrintByteSources(self, next, edges):	# add all values from byte_sources
+    for i, s in self.byte_sources.items():	# list to next list
       next.add(s)
-      edges.add("{}:b{} -> {};".format(self.Label(), i, s.Label()))
+      edges.add("{}:b{} -> {};".format(self.Label(), i, s.Label())) # set n
 
   def _bytes(self):
     return "|".join("<b{}>".format(i) for i in range(self.size))
@@ -153,25 +153,41 @@ def PrintBlocks():
   seen, nodes, edges = set(), set(), set()
     
   blocks = collections.defaultdict(list)
+# add all BLOCK variables from B() list into blocks list
+# the list is indexed by their block number - b.nr
+
   for b in B.BLOCKS:
     blocks[b.nr].append(b)
+# XXX bs contains the block address. len (bs) gives 1.  
+# if bs contains a subgraph structure, we need to draw that
+# in either case, we take individual element in bs and process it 
 
   for nr, bs in blocks.items():
     if 1 < len(bs):
       print "subgraph cluster{} {{".format(nr)
       print "rankdir=TB;"
     for b in bs:
+# add the block that has been traversed into the "seen" list
       seen.add(b)
+# print the grey boxes. Also, see if "nr" and "size" parameters
+# are instances of V. if not, create node element and add it
+# to nodes list. create edges element and add edge
       b.Print(nodes, edges)
+# PrintByteSources - will not print any new output on
+# the xdot file. 
+# Assign a node to each byte. add edges from
+# byte to the node. At the end, we would have created 64 nodes
+# for each byte in the block, with 64 edges, each edge 
+# identified by block node id:byte_offset and byte node id
       b.PrintByteSources(nodes, edges)
     if 1 < len(bs):
       print "}"
 
   while nodes:
     node = nodes.pop()
-    if node not in seen:
-      seen.add(node)
-      node.Print(nodes, edges)
+    if node not in seen:        # these are nodes corresponding to
+      seen.add(node)            # size, number and byte for each
+      node.Print(nodes, edges)  # block
       node.PrintByteSources(nodes, edges)
   
   for edge in edges:
