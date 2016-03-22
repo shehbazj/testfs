@@ -64,7 +64,8 @@ read_blocks(struct super_block *sb, char *blocks, int start, int nr)
                 EXIT("fseek");
         }
         for (int i = 0; i < nr; i++) {
+		// read into your buffer (blocks) one block at a time.
+		// start+i contains the source device address.
             fslice_read_block(blocks + i * BLOCK_SIZE, BLOCK_SIZE, start+i);
         }
 }
-

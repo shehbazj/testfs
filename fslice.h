@@ -27,4 +27,10 @@ extern void __fslice_data(void *content, int len);
 #define fslice_data(a,n) \
   if (__fslice_data) __fslice_data(a,n)
 
+__attribute__((weak))
+extern void __fslice_clear();
+
+#define fslice_clear() \
+  if (__fslice_clear) __fslice_clear()
+
 #endif  // FSLICE_H_
