@@ -28,6 +28,10 @@
 *.x86_64
 *.hex
 
+# Final Executables
+testfs
+mktestfs
+
 # Cygwin
 *.stackdump
 
@@ -36,3 +40,6 @@
 
 # TestFS image
 *.img
+
+# Bytecode files
+*.bc
