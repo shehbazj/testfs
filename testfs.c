@@ -182,7 +182,7 @@ main(int argc, char * const argv[])
 	// read from the disk. after successful execution, we have 
 	// sb initialized to dsuper_block read from disk.
         ret = testfs_init_super_block(args->disk,args-> corrupt, &sb);
-	fslice_clear();	
+	//fslice_clear();	
         if (ret) {
             EXIT("testfs_init_super_block");
         }
