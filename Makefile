@@ -34,6 +34,7 @@ depend:
 clean:
 	rm -f *.o depend.mk $(PROGS) *.exe *.stackdump
 	rm -rf *~
+	rm -rf *.bc
 
 realclean: clean
 	rm -f *.img
