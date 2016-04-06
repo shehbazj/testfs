@@ -17,7 +17,7 @@
 
 using namespace llvm;
 
-// Set of llvm values that represent a logical variables.
+// Set of llvm values that represent a logical variable.
 struct VSet {
   VSet *rep;
   int index;

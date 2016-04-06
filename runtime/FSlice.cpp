@@ -9,6 +9,14 @@
 #include <set>
 #include <vector>
 #include <cerrno>
+#include <sstream>
+
+template<typename T>
+std::string tostring(const T& t) {
+	std::ostringstream ss;
+	ss << t;
+	return ss.str();
+}
 
 // Attribute packed is for space compaction. Any object instance created for Taint 
 // requires exactly 64 bits. If packed was not used, each attribute of the structure
@@ -32,6 +40,8 @@ struct SaveErrno {
 // Try to merge things like binary operators, constants, and memory loads
 // into single taint nodes.
 #define CACHE 1
+#define VALUE_CACHE 1
+#define OP_CACHE 1
 
 // Treat heap-allocated memory objects as special intermediate objects.
 #define MEM false
@@ -52,7 +62,10 @@ static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
 static std::unordered_map<const char *,std::unordered_map<uint64_t,Taint>> gBinaryOps;
 static unsigned gId = 1;
 
-extern "C" Taint __fslice_value(uint64_t);
+static std::string TaintAsString(Taint t) {
+	return "Taint<" + tostring(t.id) + ", " + tostring(t.offset) + ", "
+			+ tostring(t.is_obj) + ">";
+}
 
 // Load a taint from the shadow memory.
 
@@ -64,6 +77,8 @@ extern "C" Taint __fslice_value(uint64_t);
 
 static Taint Load(uint64_t addr, uint64_t size) {
   SaveErrno save_errno;
+  std::cerr << "# Invoking Load(" << addr << ", " << size << ")\n";
+
 #if CACHE
   // So this isn't super great, but it's sufficient for now. Hopefully there
   // are no collisions!
@@ -79,14 +94,14 @@ static Taint Load(uint64_t addr, uint64_t size) {
 #else
   Taint t = {gId++, 0, false};
 #endif
-  auto sep = "";
-  std::cerr << "t" << t.id << "=O(";
+  auto sep = ",";
+  std::cerr << "t" << t.id << "=O(" << t.id;
   for (auto i = 0U; i < size; ++i) {
     const auto mt = gShadow[addr + i];
     std::cerr << sep << "t" << mt.id << "[" << mt.offset << "]";
-    sep = ",";
+    //sep = ",";
   }
-  std::cerr << ")" << std::endl;
+  std::cerr << ") # Load(" << addr << ", " << size << ")" << std::endl;
   return t;
 }
 
@@ -96,11 +111,15 @@ static Taint Load(uint64_t addr, uint64_t size) {
 
 static void Store(uint64_t addr, uint64_t size, Taint t) {
   SaveErrno save_errno;
+  std::cerr << "# Invoking Store(" << addr << ", " << size << ", "
+			<< TaintAsString(t) << ")" << std::endl;
+
   for (auto i = 0U; i < size; ++i) {
     auto &et = gShadow[addr + i];
     if (et.is_obj) {
-      std::cerr << "t" << et.id << "[" << et.offset << "]=t" << t.id << "["
-                << (t.offset + i) << "]" << std::endl;
+      std::cerr << "t" << et.id << "[" << et.offset << "]=t" << t.id
+                << "[" << (t.offset + i) << "] # Store::is_obj equals true."
+                << std::endl;
     } else {
       et = {t.id, t.offset + i, false};  // should be `taint.offset + i`?
     }
@@ -177,6 +196,9 @@ extern "C" void *__fslice_memset(void *dst, int val, uint64_t size) {
 // taint destination address with the same value as that at source
 extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
   SaveErrno save_errno;
+  std::cerr << "# Invoking __fslice_memmove(" << dst << ", " << src << ", " << size
+		    << ")\n";
+
   const auto daddr = reinterpret_cast<uint64_t>(dst);
   const auto saddr = reinterpret_cast<uint64_t>(src);
   for (auto i = 0U; i < size; ++i) {
@@ -213,8 +235,8 @@ extern "C" void *__fslice_malloc(uint64_t size) {
  // gArgs(0).  
  // TODO understand why we need gArgs(0) taint value with newly created taint value
 
-  std::cerr << "t" << t.id << "=M(" << size << ",t"
-            << __fslice_load_arg(0).id << ")" << std::endl;
+  std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
+			<< ",t" << __fslice_load_arg(0).id << ")" << std::endl;
   for (auto i = 0U; i < size; ++i) {
     gShadow[addr + i] = {t.id, i, MEM}; // MEM -treat heap allocated objects as separate objects
   }					// by default it is false.
@@ -226,10 +248,11 @@ extern "C" void *__fslice_calloc(uint64_t num, uint64_t size) {
   auto ptr = calloc(num, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
   Taint t = {gId++, 0};
-  // TODO why are we loading taint id twice?
-  std::cerr << "t" << t.id << "=M(" << size << ",t"
-            << __fslice_load_arg(0).id << ",t"
-            << __fslice_load_arg(0).id << ")" << std::endl;
+
+  std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
+			<< ",t" << __fslice_load_arg(0).id << ",t"
+            << __fslice_load_arg(1).id << ")" << std::endl;
+
   for (auto i = 0U; i < num * size; ++i) {
     gShadow[addr + i] = {t.id, i, MEM};
   }
@@ -238,22 +261,33 @@ extern "C" void *__fslice_calloc(uint64_t num, uint64_t size) {
 }
 
 extern "C" Taint __fslice_value(uint64_t val) {
-  SaveErrno save_errno;
-#if CACHE
-  auto &t = gValues[val];  // if value is not already tainted, taint it
-  if (val && !t.id) {		// TODO should gValues[val] = {gId++,0, false} not
-    Taint t = {gId++, 0, false};	// be called here?
-    std::cerr << "t" << t.id << "=V(" << val << ")" << std::endl;
-  }
-  return t;
+	SaveErrno save_errno;
+#if VALUE_CACHE
+	auto &t = gValues[val];
+	if (/*val && */!t.id) {
+		t = { gId++, 0, false };
+		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # "
+				<< TaintAsString(t) << std::endl;
+	}
+	/*else {
+		std::cerr << "# The taint value for constant " << val << " already exists: "
+				<< TaintAsString(t) << std::endl;
+	}*/
+
+	/*std::cout << "gValues contains:";
+	for (auto it = gValues.begin(); it != gValues.end(); ++it)
+		std::cout << " " << it->first << ":" << TaintAsString(it->second);
+	std::cout << std::endl;*/
+
+	return t;
 #else
-  if (val) {
-    Taint t = {gId++, 0, false};
-    std::cerr << "t" << t.id << "=V(" << val << ")" << std::endl;
-    return t;
-  } else {
-    return {0, 0, false};
-  }
+	/*if (val) { */
+		Taint t = {gId++, 0, false};
+		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # " << TaintAsString(t) << std::endl;
+		return t;
+	/*} else {
+		return {0, 0, false};
+	}*/
 #endif
 }
 
@@ -262,18 +296,18 @@ extern "C" Taint __fslice_value(uint64_t val) {
 
 extern "C" Taint __fslice_op2(const char *op, Taint t1, Taint t2) {
   SaveErrno save_errno;
-#if CACHE
+#if OP_CACHE
   const auto id = t1.id | (static_cast<uint64_t>(t2.id) << 32);
   auto &t = gBinaryOps[op][id];
   if (!t.id) {
     t = {gId++, 0, false};
     std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
-              << ",t" << t2.id << ")" << std::endl;
+              << ",t" << t2.id << ", " << t.id << ")" << std::endl;
   }
 #else
   Taint t = {gId++, 0, false};
   std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
-            << ",t" << t2.id << ")" << std::endl;
+            << ",t" << t2.id << ", " << t.id << ")" << std::endl;
 #endif
   return t;
 }
@@ -286,9 +320,14 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
     t = {gId++,0, false};
     const auto st = __fslice_load_arg(1);  // Taint for the size :-)
     const auto nt = __fslice_load_arg(2);  // Taint for the block number :-)
-    std::cerr << "t" << t.id << "=B(" << size << "," << nr << ",t"
-              << st.id << ",t" << nt.id << ")" << std::endl;
+    std::cerr << "t" << t.id << "=B(" << size << "," << nr
+			  << ",t" << st.id << ",t" << nt.id << ", " << t.id
+			  << ") # GetBlock(" << size << ", " << nr << ")"
+			  << std::endl;
     __fslice_store_ret({0,0,false});
+  }
+  else {
+        std::cerr << "# Block " << nr << " is already tainted as: t" << t.id << std::endl;
   }
   return t;
 }
@@ -300,6 +339,9 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 
 extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
   SaveErrno save_errno;
+  std::cerr << "# Invoking __fslice_read_block(" << addr << ", " << size << ", " << nr
+			<< ")\n";
+
   auto t = GetBlock(size, nr);
   for (auto i = 0U; i < size; ++i) {
     gShadow[addr + i] = {t.id, i, false};
@@ -313,12 +355,28 @@ extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
 extern "C" void __fslice_write_block(uint64_t addr, uint64_t size,
                                      uint64_t nr) {
   SaveErrno save_errno;
+  std::cerr << "# Invoking __fslice_write_block(" << addr << ", " << size << ", " << nr
+			<< ")\n";
+
   auto t = GetBlock(size, nr);
   for (auto i = 0UL; i < size; ++i) {
     const auto bt = gShadow[addr + i];
-    if (!bt.id || (t.id == bt.id && i == bt.offset)) continue;
-    std::cerr << "t" << t.id << "[" << i << "]=t" << bt.id
-              << "[" << bt.offset << "]" << std::endl;
+    if (!bt.id || (t.id == bt.id && i == bt.offset)) {
+        if (!bt.id) {
+			std::cerr << "# __fslice_write_block(" << addr << ", " << size
+					  << ", " << nr << ")::gShadow[" << (addr + i)
+					  << "] does not contain a taint value!" << std::endl;
+		}
+		if ((t.id == bt.id && i == bt.offset)) {
+			std::cerr << "# __fslice_write_block_(" << addr << ", " << size
+					  << ", " << nr << ")::gShadow[" << (addr + i)
+					  << "] does not contain a taint value!" << std::endl;
+		}
+        continue;
+    }
+    std::cerr << "t" << t.id << "[" << i << "]=t" << bt.id << "["
+			  << bt.offset << "] # fslice_write_block(" << addr << ", "
+			  << size << ", " << nr << ")" << std::endl;
   }
 }
 
@@ -329,7 +387,9 @@ extern "C" void __fslice_write_block(uint64_t addr, uint64_t size,
 extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
   Taint t = {gId++, 0};
-  std::cerr << "t" << t.id << "=N(" << len << ")" << std::endl;
+  std::cerr << "t" << t.id << "=N(" << len << ", " << t.id << ")"
+			<< std::endl;
+
   for (auto i = 0U; i < len; ++i) {
     gShadow[addr + i] = {t.id, i, false};
   }
@@ -342,7 +402,9 @@ extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
 extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
   Taint t = {gId++, 0};
-  std::cerr << "t" << t.id << "=D(" << len << ")" << std::endl;
+  std::cerr << "t" << t.id << "=D(" << len << ", " << t.id << ")"
+			<< std::endl;
+
   for (auto i = 0U; i < len; ++i) {
     auto &bt = gShadow[addr + i];
     if (bt.id) {
