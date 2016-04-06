@@ -89,7 +89,7 @@ static int testfs_write_dirent(struct inode *dir, char *name, int len,
 	assert(inode_nr >= 0);
 	d->d_name_len = len;
 	d->d_inode_nr = inode_nr;
-	strcpy(D_NAME(d), name);
+	_strcpy(D_NAME(d), name);
 	ret = testfs_write_data(dir, offset, (char *) d,
 			sizeof(struct dirent) + len);
 	free(d);
