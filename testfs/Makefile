@@ -12,7 +12,7 @@
 PROGS := testfs mktestfs
 COMMON_OBJECTS := bitmap.o block.o super.o inode.o dir.o file.o tx.o csum.o
 COMMON_SOURCES := $(COMMON_OBJECTS:.o=.c)
-DEFINES :=
+DEFINES := -std=c11 -std=gnu99
 INCLUDES := 
 #CFLAGS := -O2 -Wall -Werror $(DEFINES) $(INCLUDES)
 CFLAGS := -g -O0 -Wall -Werror $(DEFINES) $(INCLUDES)
@@ -34,6 +34,7 @@ depend:
 clean:
 	rm -f *.o depend.mk $(PROGS) *.exe *.stackdump
 	rm -rf *~
+	rm -rf *.bc
 
 realclean: clean
 	rm -f *.img

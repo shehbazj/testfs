@@ -4,6 +4,13 @@
 
 /* This is code stolen from various Linux kernel headers: hash.h, list.h, etc.
    -Ashvin */
+/*
+	container_of macro returns a pointer to the struct object, when we
+	have a pointer to one of the members of the object, and we know the
+	type of the object and the member. More explaination here
+	http://stackoverflow.com/questions/15832301/understanding-container-of-macro-in-linux-kernel
+	- S.J.
+*/
 #define container_of(ptr, type, member) ({			\
 	const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 	(type *)( (char *)__mptr - offsetof(type,member) );})

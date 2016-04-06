@@ -34,6 +34,7 @@ int cmd_rm(struct super_block *, struct context *c);
 int cmd_mkdir(struct super_block *, struct context *c);
 
 int cmd_cat(struct super_block *, struct context *c);
+int cmd_catr(struct super_block *, struct context *c);
 int cmd_write(struct super_block *, struct context *c);
 
 int cmd_checkfs(struct super_block *, struct context *c);
