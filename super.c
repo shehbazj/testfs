@@ -235,7 +235,7 @@ int testfs_alloc_block(struct super_block *sb, char *block) {
 	int phy_block_nr;
 
 	phy_block_nr = testfs_get_block_freemap(sb);
-	// if error occured, return -ENOSPC
+	// if error occurred, return -ENOSPC
 	if (phy_block_nr < 0)
 		return phy_block_nr;
 	bzero(block, BLOCK_SIZE);
@@ -259,9 +259,8 @@ static int testfs_checkfs(struct super_block *sb, struct bitmap *i_freemap,
 	int size;
 	int size_roundup = ROUNDUP(testfs_inode_get_size(in), BLOCK_SIZE);
 
-	assert(
-			(testfs_inode_get_type(in) == I_FILE)
-					|| (testfs_inode_get_type(in) == I_DIR));
+	assert((testfs_inode_get_type(in) == I_FILE) || (testfs_inode_get_type(in) == I_DIR));
+
 	/* inode processing */
 	bitmap_mark(i_freemap, inode_nr);
 	if (testfs_inode_get_type(in) == I_DIR) {

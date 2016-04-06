@@ -164,11 +164,11 @@ int main(int argc, char * const argv[]) {
 	// initializes the in memory structure sb with data that is 
 	// read from the disk. after successful execution, we have 
 	// sb initialized to dsuper_block read from disk.
-        ret = testfs_init_super_block(args->disk,args-> corrupt, &sb);
+	ret = testfs_init_super_block(args->disk, args->corrupt, &sb);
 	//fslice_clear();	
-        if (ret) {
-            EXIT("testfs_init_super_block");
-        }
+	if (ret) {
+		EXIT("testfs_init_super_block");
+	}
 	/* if the inode does not exist in the inode_hash_map (which
 	 is an inmemory map of all inode blocks, create a new inode by
 	 allocating memory to it. read the dinode from disk into that

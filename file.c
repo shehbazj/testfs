@@ -16,8 +16,6 @@ int cmd_cat(struct super_block *sb, struct context *c) {
 		return -EINVAL;
 	}
 
-	printf("Invoking cmd_cat with: %d, %s, %p\n", c->nargs, c->cmd[1], c->cur_dir);
-
 	for (i = 1; ret == 0 && i < c->nargs; i++) {
 		inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, c->cmd[i]);
 		if (inode_nr < 0)
@@ -54,8 +52,6 @@ int cmd_catr(struct super_block *sb, struct context *c) {
 	int ret = 0;
 	int sz;
 	char *buf;
-
-	printf("Invoking cmd_catr with: %d, %s, %p\n", c->nargs, c->cmd[1], c->cur_dir);
 
 	if (c->nargs > 2) {
 		return -EINVAL;
