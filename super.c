@@ -5,6 +5,7 @@
 #include "block.h"
 #include "bitmap.h"
 #include "csum.h"
+#include "fslice.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -82,7 +83,7 @@ int testfs_init_super_block(const char *file, int corrupt,
 	// read from sb into block.
 	read_blocks(sb, block, 0, 1);
 	// copy only 24 bytes from block corresponding to dsuper_block
-	memcpy(&sb->sb, block, sizeof(struct dsuper_block));
+	_memcpy(&sb->sb, block, sizeof(struct dsuper_block));
 
 	// 64 * 1 * 8
 	// bitmap create will return a inode_bitmap structure.
@@ -132,7 +133,7 @@ void testfs_write_super_block(struct super_block *sb) {
 	char block[BLOCK_SIZE] = { 0 };
 
 	assert(sizeof(struct dsuper_block) <= BLOCK_SIZE);
-	memcpy(block, &sb->sb, sizeof(struct dsuper_block));
+	_memcpy(block, &sb->sb, sizeof(struct dsuper_block));
 	write_blocks(sb, block, 0, 1);
 }
 
@@ -238,7 +239,7 @@ int testfs_alloc_block(struct super_block *sb, char *block) {
 	// if error occurred, return -ENOSPC
 	if (phy_block_nr < 0)
 		return phy_block_nr;
-	bzero(block, BLOCK_SIZE);
+	_bzero(block, BLOCK_SIZE);
 	return sb->sb.data_blocks_start + phy_block_nr;
 }
 
