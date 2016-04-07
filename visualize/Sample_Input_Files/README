@@ -1,0 +1,8 @@
+In order to generate the _sorted.txt version of an input file, execute the following command:
+cat data_structures.txt | tr ':' ' ' | sort -n -k1,1 -k 2,2 | uniq > data_structures_sorted.txt
+
+Then, execute the following commmand in order to generate the corresponding .dot file.
+python ../printDataStructures.py < data_structures_sorted.txt > /tmp/temp.dot
+
+Finally, execute the following command to actually see the generated graph:
+xdot /tmp/temp.dot

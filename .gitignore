@@ -7,3 +7,6 @@ whole-program-llvm/*
 .cproject
 cscope.out
 tags
+
+# Testfs stuff.
+testfs/*.bc
