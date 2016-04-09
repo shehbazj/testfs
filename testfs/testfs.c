@@ -25,7 +25,7 @@ static struct {
         { "pwd",        cmd_pwd,        1, },
         { "ls",         cmd_ls,         2, },
         { "lsr",        cmd_lsr,        2, },
-        { "touch",      cmd_create,     2, },
+        { "touch",      cmd_create,     MAX_ARGS, },
         { "stat",       cmd_stat,       MAX_ARGS, },
         { "rm",         cmd_rm,         2, },
         { "mkdir",      cmd_mkdir,      2, },
@@ -62,13 +62,18 @@ static void handle_command(struct super_block *sb, struct context *c,
 	if (name == NULL)
 		return;
 
+	/* c->cmd[0] contains the command's name. This statement must be executed
+	 * at every invocation. Otherwise, if the command does not exist, c->cmd[0]
+	 * will either contain the last successful executed command, or it will be
+	 * undefined possibly resulting in a Segmentation fault. */
+	c->cmd[j++] = name;
+
 	for (i = 0; cmdtable[i].name; i++) {
 		if (strcmp(name, cmdtable[i].name) == 0) {
 			char * token = args;
 			assert(cmdtable[i].func);
 
-			c->cmd[j++] = name;	// context->cmd contains
-			// command arguments
+			// context->cmd contains the command's arguments, starting from index 1.
 			while (j < cmdtable[i].max_args
 					&& (c->cmd[j] = strtok(token, " \t\n")) != NULL) {
 				j++;
@@ -89,7 +94,7 @@ static void handle_command(struct super_block *sb, struct context *c,
 			return;
 		}
 	}
-	printf("%s: command not found: type ?\n", c->cmd[0]);
+	printf("%s: command not found: type ? for help...\n", c->cmd[0]);
 }
 
 static void usage(const char * progname) {
