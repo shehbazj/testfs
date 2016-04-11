@@ -1,0 +1,96 @@
+Master Script:
+
+./createFileSystem <percentage full>
+
+eg
+./createFileSystem 25
+./createFileSystem 50
+./createFileSystem 75
+
+
+
+======================================================================================================
+
+The folder contains scripts to generate commands to create files and directories in testfs filesystem.
+
+script 1:
+
+./createFileAndDir <numDir> <numFiles>
+
+The script considers TestFS file system to have the following configuration:
+
+number of inodes = 128
+number of data blocks = 512
+
+for numDir <=3 or numFiles <=3, the script generates commands for creating numDir and numFile number
+of files in the root directory.
+
+If numDir > 3 and numFiles > 3, it generates the following schema:
+
+dir1/dir1_1/file1_1_1 # 2 level directory
+
+dir2/file2_2	# 1 level file
+
+dir3/dir3_3	# 1 level directory
+
+dir4 .. dir<numDir> directories in / 
+
+file3 ... file<numFiles> files in /
+
+
+To generate a 25 % full filesytem, we can give input as
+
+./createFileAndDir 16 16 # since 25% of inodes i.e. 32 inodes out of 128 need to be populated
+
+To generate a 50 % full filesytem, we can give input as
+
+./createFileAndDir 32 32
+
+To generate a 75 % full filesystem
+
+./createFileAndDir 48 48 
+
+To generate a 90 % full filesystem
+
+./createFileAndDir 58 58
+
+
+==========================================================================================================
+
+script 2:
+
+./generateData <numDir> <numFiles> <numDataBlocks> <mode>
+
+This file generates data to write to numFiles. numDir is required to know if files exist
+as multi-level directories. 
+
+it generates numDataBlocks * 64 random bytes, let us call it TOTAL_BYTES.
+
+mode = 0 -> uniform sized distribution - all files are of the same size.
+size of all files  = TOTAL_BYTES / numFile
+
+mode = 1 -> binary sized file distribution - files have a binary distribution.
+It writes TOTAL_BYTES / 2 to 1 file. let us call the remaining bytes as REMAINING_BYTES.
+
+Then, it keeps writing REMAINING_BYTES / 2 to each of the left out files, until 
+
+a) the REMAINING_BYTES < numFiles, in which case, it will write 1 byte to each of the left out files.
+b) REMAINING_BYTES < BLOCK_SIZE. in which case, it stops writing REMAINING_BYTES/2 but writes 
+floor (REMAINING_BYTES / numFiles) to each of the files.
+
+for creating 25% full file system:
+
+./generateData 16 16 128
+
+50% file system
+
+./generateData 32 32 256
+
+75% file system
+
+./generateData 48 48 384
+
+90% file system
+
+./generateData 58 58 451
+
