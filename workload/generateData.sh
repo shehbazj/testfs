@@ -43,13 +43,13 @@
 
 		begin=0
 		end=$avg_file_size
-		echo -e "cd dir1/dir1_2/\nwrite file1 ${byte_string:begin:end}\ncd"
+		echo -e "cd dir1\ncd dir1_2\nwrite file1 ${byte_string:begin:end}\ncd ..\ncd .."
 		
 	# write data to 1 level directory with 1 file i.e. dir3/file2
 	
 		begin=$((end+1))	
 		end=$((begin+$avg_file_size))
-		echo -e "cd dir3/\nwrite file2 ${byte_string:begin:$((end-$begin))}\ncd"
+		echo -e "cd dir3\nwrite file2 ${byte_string:begin:$((end-$begin))}\ncd .."
 	
 		REMAINING_BYTES=$((TOTAL_BYTES - $((avg_file_size *2))))
 	
