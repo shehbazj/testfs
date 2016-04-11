@@ -42,6 +42,7 @@ struct SaveErrno {
 #define CACHE 1
 #define VALUE_CACHE 1
 #define OP_CACHE 1
+#define BLOCKS_CACHE 0
 
 // Treat heap-allocated memory objects as special intermediate objects.
 #define MEM false
@@ -55,9 +56,10 @@ static std::unordered_map<uint64_t,Taint> gShadow;
 static std::unordered_map<uint64_t,Taint> gValues;
 static std::unordered_map<uint64_t,Taint> gObjects;
 
-static std::set<uint64_t> gPrintedBlocks;
 static std::unordered_map<uint64_t,Taint> gBlocks;
-static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
+//static std::set<uint64_t> gPrintedBlocks;
+//static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
+
 // op = char value. every op has a <object, taint> value
 static std::unordered_map<const char *,std::unordered_map<uint64_t,Taint>> gBinaryOps;
 static unsigned gId = 1;
@@ -176,21 +178,18 @@ extern "C" void __fslice_store_arg(uint64_t i, Taint taint) {
   gArgs[i] = {taint.id, taint.offset, false};
 }
 
-//    
-
 extern "C" void *__fslice_memset(void *dst, int val, uint64_t size) {
-  SaveErrno save_errno;
-  const auto t = __fslice_load_arg(1); // from gArgs unoredered map, load 1st element's taint value
-					// into t, and then initialize gArgs[1] to 0,0,false.
-					// TODO why do we load taint values of the 1st argument?
+	SaveErrno save_errno;
+	const auto t = __fslice_load_arg(1); 	// from gArgs unordered map, load 1st element's taint value
+											// into t, and then initialize gArgs[1] to 0,0,false.
 
-  const auto daddr = reinterpret_cast<uint64_t>(dst);
-  for (auto i = 0U; i < size; ++i) {
-    gShadow[daddr + i] = t;		// use the taint value and taint all elements till 
-  }					// daddr+ size with taint id t.
-  __fslice_store_ret({0,0,false}); // gReturn is initialized with {0,0,false}
-  return memset(dst, val, size);	// initialize the address with val. 
-					// the main purpose why memset was called!
+	const auto daddr = reinterpret_cast<uint64_t>(dst);
+	for (auto i = 0U; i < size; ++i) {
+		gShadow[daddr + i] = t; 			// use the taint value and taint all elements till
+	}                                       // daddr+ size with taint id t.
+	__fslice_store_ret( { 0, 0, false }); 	// gReturn is initialized with {0,0,false}
+	return memset(dst, val, size);          // initialize the address with val.
+											// the main purpose why memset was called!
 }
 
 // taint destination address with the same value as that at source
@@ -205,6 +204,7 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
     const auto bt = gShadow[saddr + i];
     gShadow[daddr + i] = {bt.id, bt.offset, false};
   }
+
   __fslice_store_ret({0,0,false}); // initialize all gArgs. intialize gRet to 0,0,false
   return memmove(dst, src, size);
 }
@@ -231,12 +231,10 @@ extern "C" void *__fslice_malloc(uint64_t size) {
   auto ptr = calloc(1, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
   Taint t = {gId++, 0};
- // here we are creating new taint id, then we map newly created taint id with 
- // gArgs(0).  
- // TODO understand why we need gArgs(0) taint value with newly created taint value
 
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ")" << std::endl;
+
   for (auto i = 0U; i < size; ++i) {
     gShadow[addr + i] = {t.id, i, MEM}; // MEM -treat heap allocated objects as separate objects
   }					// by default it is false.
@@ -264,20 +262,11 @@ extern "C" Taint __fslice_value(uint64_t val) {
 	SaveErrno save_errno;
 #if VALUE_CACHE
 	auto &t = gValues[val];
-	if (/*val && */!t.id) {
+	if (/*val && */ !t.id) {
 		t = { gId++, 0, false };
 		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # "
 				<< TaintAsString(t) << std::endl;
 	}
-	/*else {
-		std::cerr << "# The taint value for constant " << val << " already exists: "
-				<< TaintAsString(t) << std::endl;
-	}*/
-
-	/*std::cout << "gValues contains:";
-	for (auto it = gValues.begin(); it != gValues.end(); ++it)
-		std::cout << " " << it->first << ":" << TaintAsString(it->second);
-	std::cout << std::endl;*/
 
 	return t;
 #else
@@ -312,24 +301,27 @@ extern "C" Taint __fslice_op2(const char *op, Taint t1, Taint t2) {
   return t;
 }
 
-// TODO Taint for the block number. and size. why?
-
 static Taint GetBlock(uint64_t size, uint64_t nr) {
-  auto &t = gBlocks[nr];
-  if (!t.id) {
-    t = {gId++,0, false};
-    const auto st = __fslice_load_arg(1);  // Taint for the size :-)
-    const auto nt = __fslice_load_arg(2);  // Taint for the block number :-)
-    std::cerr << "t" << t.id << "=B(" << size << "," << nr
-			  << ",t" << st.id << ",t" << nt.id << ", " << t.id
-			  << ") # GetBlock(" << size << ", " << nr << ")"
-			  << std::endl;
-    __fslice_store_ret({0,0,false});
-  }
-  else {
-        std::cerr << "# Block " << nr << " is already tainted as: t" << t.id << std::endl;
-  }
-  return t;
+	Taint t = { 0, 0, false };
+#if BLOCKS_CACHE
+	t = gBlocks[nr];
+#endif
+	if (!t.id) {
+		t = {gId++, 0, false};
+		const auto st = __fslice_load_arg(1);  // Taint for the size :-)
+		const auto nt = __fslice_load_arg(2);  // Taint for the block number :-)
+		std::cerr << "t" << t.id << "=B(" << size << "," << nr << ",t" << st.id
+				<< ",t" << nt.id << ", " << t.id << ") # GetBlock(" << size
+				<< ", " << nr << ")" << std::endl;
+		__fslice_store_ret( { 0, 0, false });
+	} else {
+		std::cerr << "# Block " << nr << " is already tainted as: t" << t.id
+				<< std::endl;
+	}
+#if BLOCKS_CACHE
+	gBlocks[nr] = t;
+#endif
+	return t;
 }
 
 // Go through each of the blocks, and populate gShadow with the block ids of read objects
@@ -339,8 +331,8 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 
 extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
   SaveErrno save_errno;
-  std::cerr << "# Invoking __fslice_read_block(" << addr << ", " << size << ", " << nr
-			<< ")\n";
+  std::cerr << "# Invoking __fslice_read_block(" << addr << ", " << size
+		    << ", " << nr << ")\n";
 
   auto t = GetBlock(size, nr);
   for (auto i = 0U; i < size; ++i) {
@@ -352,8 +344,7 @@ extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
 // S.J. if the block that is being written is already tainted, write trace.
 // if the block is not tainted, continue.
 
-extern "C" void __fslice_write_block(uint64_t addr, uint64_t size,
-                                     uint64_t nr) {
+extern "C" void __fslice_write_block(uint64_t addr, uint64_t size, uint64_t nr) {
   SaveErrno save_errno;
   std::cerr << "# Invoking __fslice_write_block(" << addr << ", " << size << ", " << nr
 			<< ")\n";
@@ -370,7 +361,7 @@ extern "C" void __fslice_write_block(uint64_t addr, uint64_t size,
 		if ((t.id == bt.id && i == bt.offset)) {
 			std::cerr << "# __fslice_write_block_(" << addr << ", " << size
 					  << ", " << nr << ")::gShadow[" << (addr + i)
-					  << "] does not contain a taint value!" << std::endl;
+					  << "] contains the same taint value!" << std::endl;
 		}
         continue;
     }
