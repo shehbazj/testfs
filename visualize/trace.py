@@ -3,13 +3,14 @@ import re
 
 if __name__ == "__main__":
     """ Main Start """
-    # seeded on /tmp/testfs.py
+
     parser = argparse.ArgumentParser()
     parser.add_argument('taint_val', type=str, help="TaintID to trace: ex. 1234")
+    parser.add_argument('trace_file', type=str, help="The path to the trace file.")
     parser.add_argument('-b', action='store_true')
     args = parser.parse_args()
 
-    with open('/tmp/testfs.py', 'r') as f:
+    with open(args.trace_file, 'r') as f:
 
         relevant_lines = []
 
