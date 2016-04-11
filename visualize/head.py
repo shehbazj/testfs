@@ -1,22 +1,30 @@
-import sys
-import collections
 import argparse
+import collections
+import sys
+import time
 
 parser = argparse.ArgumentParser(description='Calculate output graph.')
 parser.add_argument('--metadata', dest='PRINT_METADATA', const=True, default=False,
                     nargs='?', help='Print metadata.')
+parser.add_argument('--verbose', dest='VERBOSE', const=True, default=False,
+                    nargs='?', help='Print debug information.')
 
 args = parser.parse_args()
 
+# Data types.
 pointerList = collections.defaultdict(list)
 pointerSet = set()
 valueSet = collections.defaultdict(int)
 abstractDataSet = set()
 nameSet = set()
 
+# Block types.
+directory_entry_blocks = dict()
+data_blocks = dict()
+
 
 class Base(object):
-    def __init__(self, taintID = ""):
+    def __init__(self, taintID=""):
         self.size = 1
         self.byte_sources = {}
         self.taintID = taintID
@@ -57,9 +65,18 @@ class Select(Base):
         Base.__init__(self, parent.taintID)
         self.parent = parent
         self.byte = byte
+        self.seen = False
 
     def markPointers(self, block_number):
-        self.parent.markPointer(self.byte, block_number)
+        if self.seen:
+            return
+
+        if isinstance(self.parent, B):
+            self.parent.markPointer(self.byte, block_number)
+        else:
+            self.parent.markPointers(block_number)
+
+        self.seen = True
 
     def Print(self, next, edges):
         next.add(self.parent)
@@ -74,10 +91,6 @@ class V(Base):
         self.val = val
         self.usedAsPointer = False
 
-    def markPointers(self, block_number):
-        assert self.val == block_number
-        self.usedAsPointer = True
-
     def Print(self, next, edges):
         print "{} [label=\"{{{{{}}}|{}}}\"];".format(self.Label(), self._bytes(), self.val)
 
@@ -88,11 +101,6 @@ class A(Base):
         self.op = op
         self.left = a
         self.right = b
-
-        # if isinstance(self.left, V):
-        #     print "[Object {}]: Found value: {}".format(self.taintID, self.left.taintID)
-        # elif isinstance(self.right, V):
-        #     print "[Object {}]: Found value: {}".format(self.taintID, self.right.taintID)
 
     def markPointers(self, block_number):
         self.left.markPointers(block_number)
@@ -114,7 +122,7 @@ class A(Base):
             edges.add("{}:right -> {} [ label=\"t{}\" ];".format(self.Label(), self.right.Label(), self.right.taintID))
 
         print "{} [color=blue label=\"{{ {{ {} }} | {{ {} | t{} }} | {{{}|{}}} }}\"];".format(
-                self.Label(), self._bytes(), self.op, self.taintID, LL, RL)
+            self.Label(), self._bytes(), self.op, self.taintID, LL, RL)
 
 
 class O(Base):
@@ -122,10 +130,6 @@ class O(Base):
         Base.__init__(self, taintID)
         self.bytes = bytes
         self.size = len(self.bytes)
-
-        # if self.size > 0:
-        #     if isinstance(self.__getitem__(0), V):
-        #         print "[Object {}]: Found value: {}".format(self.taintID, self.__getitem__(0).taintID)
 
     def markPointers(self, block_number):
         for i in xrange(0, self.size):
@@ -155,17 +159,13 @@ class B(Base):
         self.block_size = block_size
         self.block_nr = block_nr
         self.BLOCKS.append(self)
+        self.data_bytes = 0
+        self.name_bytes = 0
 
-        if not isinstance(self.block_size, V):
-            block_size.markPointers(self.nr)
-
-        if not isinstance(self.block_nr, V):
-            block_nr.markPointers(self.nr)
-
-        # if isinstance(self.block_size, V):
-        #     print "[Object {}]: Found value: {}".format(self.taintID, self.block_size.taintID)
-        # elif isinstance(self.block_nr, V):
-        #     print "[Object {}]: Found value: {}".format(self.taintID, self.block_nr.taintID)
+        # Search for on-disk pointers by following taints in
+        # a backwards fashion.
+        block_size.markPointers(self.nr)
+        block_nr.markPointers(self.nr)
 
     def __setitem__(self, byte, val):
         Base.__setitem__(self, byte, val)
@@ -174,16 +174,32 @@ class B(Base):
             valueSet[(self.nr * self.size) + byte] = val.parent.val
 
         if isinstance(val.parent, D):
-            # print "Inside block {} with offset {} and value {} and {}".format(self.nr, byte, val.taintID, val.parent.getByte(byte).parent.taintID)
+            if args.VERBOSE:
+                print "Inside block {} with offset {} and value {} and {}".format(self.nr, byte, val.taintID, val.parent.getByte(byte).parent.taintID)
+
             if val.parent.getByte(val.byte).parent.getName() == 'N':
                 nameSet.add((self.nr * self.size) + byte)
+                directory_entry_blocks[self.nr] = self
+                self.name_bytes += 1
             else:
                 abstractDataSet.add((self.nr * self.size) + byte)
+                self.data_bytes += 1
 
     def markPointer(self, byte, block_number):
         disk_offset = (self.size * self.nr) + byte
         pointerList[block_number].append(disk_offset)
         pointerSet.add(disk_offset)
+
+        if args.VERBOSE:
+            print "[{} INFO]: Byte {} was marked as part of a pointer.".format(time.time(), disk_offset)
+
+    def isDataBlock(self):
+        if self.name_bytes > 0:
+            return False
+        elif self.data_bytes > 0:
+            return True
+        else:
+            return False
 
     def Print(self, next, edges):
         print "{} [rank=max fillcolor=grey style=filled label=\"{{{{{}}}|{{<size>size = {} | <nr>nr = {} | <tid>tid = {}}}}}\"];" \
@@ -197,7 +213,7 @@ class B(Base):
         if not isinstance(self.block_nr, V):
             next.add(self.block_nr)
             edges.add("{}:nr -> {} [ label=\"t{}\" ];"
-                      .format(self.Label(), self.block_nr.Label(),self.block_nr.taintID))
+                      .format(self.Label(), self.block_nr.Label(), self.block_nr.taintID))
 
 
 class NT(Base):
@@ -243,7 +259,7 @@ class M(Base):
         self.size_deps = size_deps
 
     def Print(self, next, edges):
-        if(self.isObject):
+        if (self.isObject):
             print "{} [fillcolor=darkgoldenrod style=filled label=\"{{{{{}}} | {{<size>size = {} | t{} }}}}\"];" \
                 .format(self.Label(), self._bytes(), self.size, self.taintID)
         else:
@@ -256,23 +272,32 @@ class M(Base):
 
 
 def PrintBlocks():
-    if args.PRINT_METADATA:
-        # print(pointerList)
-        print "PointerSet: {}". format(pointerSet)
-        print "NameSet: {}".format(nameSet)
-        print "AbstractSet: {}".format(abstractDataSet)
-        print "ValueSet: {}".format(valueSet)
-        sys.exit(0)
-
-    print "digraph {"
-    print "node [shape=record];"
-    seen, nodes, edges = set(), set(), set()
-
     # Initialize blocks to be a dictionary of lists.
     # Organize blocks based on their block number.
     blocks = collections.defaultdict(list)
     for b in B.BLOCKS:
         blocks[b.nr].append(b)
+
+    if args.PRINT_METADATA:
+        for nr, block_list in blocks.items():
+            for block in block_list:
+                if block.isDataBlock():
+                    data_blocks[nr] = block
+
+        # print(pointerList)
+        print "PointerSet: {}".format(sorted(pointerSet))
+        print "NameSet: {}".format(nameSet)
+        print "AbstractSet: {}".format(abstractDataSet)
+        print "ValueSet: {}".format(valueSet)
+
+        print "Blocks with directory entries: {}".format(directory_entry_blocks)
+        print "Datablocks: {}".format(data_blocks)
+
+        sys.exit(0)
+
+    print "digraph {"
+    print "node [shape=record];"
+    seen, nodes, edges = set(), set(), set()
 
     for nr, bs in blocks.items():
         # nr = block number (the key of the dictionary)
@@ -282,10 +307,10 @@ def PrintBlocks():
             # By denoting subgraph as a cluster, the entire drawing of the
             # cluster will be contained within a bounding rectangle.
             print "subgraph cluster{} {{".format(nr)
-            print "rankdir=TB;" # Graph will be laid out from top to bottom.
+            print "rankdir=TB;"  # Graph will be laid out from top to bottom.
 
         for b in bs:
-            seen.add(b) # Mark block as "seen".
+            seen.add(b)  # Mark block as "seen".
             b.Print(nodes, edges)
             b.PrintByteSources(nodes, edges)
         if 1 < len(bs):
@@ -294,7 +319,7 @@ def PrintBlocks():
     while nodes:
         node = nodes.pop()
         if node not in seen:
-            seen.add(node) # Mark block as "seen" in order not to process it.
+            seen.add(node)  # Mark block as "seen" in order not to process it.
             node.Print(nodes, edges)
             node.PrintByteSources(nodes, edges)
 
@@ -302,5 +327,6 @@ def PrintBlocks():
         print edge
 
     print "}"
+
 
 t0 = NT(0)
