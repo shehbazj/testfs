@@ -19,4 +19,4 @@ $(DIR)/build/libFSlice.so: $(DIR)/build
 	@$(MAKE) -C $(DIR)/build all
 
 $(DIR)/build/libFSlice.bc: $(DIR)/runtime/FSlice.cpp
-	@$(DIR)/llvm/build/bin/clang++ -std=c++11 -O3 -emit-llvm -c $< -o $@
+	@$(DIR)/llvm/build/bin/clang++ -std=c++11 -O0 -emit-llvm -c $< -o $@
