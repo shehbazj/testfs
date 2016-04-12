@@ -36,7 +36,7 @@ fi
 make clean; make all
 
 # Get testfs and instrument it.
-# git clone git@github.com:pgoodman/testfs.git
+ git clone git@github.com:shehbazj/testfs.git
 ./env.sh make -C testfs clean all
 ./run.sh testfs/testfs
 

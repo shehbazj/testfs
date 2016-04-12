@@ -48,7 +48,7 @@ $DIR/whole-program-llvm/extract-bc $1
 
 # optimize shared object file libFSlice.so and call it testfs.inst.bc
 
-$DIR/llvm/build/bin/opt -load $DIR/build/libFSlice.so -constprop -sccp -scalarrepl -mergereturn -sink -licm -mem2reg -fslice -mem2reg $1.bc -o $1.inst.bc
+$DIR/llvm/build/bin/opt -load $DIR/build/libFSlice.so -constprop -sccp -scalarrepl -mergereturn -sink -licm -reg2mem -fslice -reg2mem $1.bc -o $1.inst.bc
 
 # link libFSlice.bc and testfs.inst.bc and call it testfs.inst2.bc
 
@@ -56,7 +56,7 @@ $DIR/llvm/build/bin/llvm-link -o=$1.inst2.bc $DIR/build/libFSlice.bc $1.inst.bc
 
 # Optimize the linked file testfs.inst2.bc and call it testfs.opt.bc. 
 
-$DIR/llvm/build/bin/opt -O2 $1.inst2.bc -o $1.opt.bc
+$DIR/llvm/build/bin/opt -O0 $1.inst2.bc -o $1.opt.bc
 
 # Compile bc with clang that would result in creation of .o optimized file
 
