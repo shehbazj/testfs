@@ -1,11 +1,11 @@
 Master Script:
 
-./createFileSystem <percentage full>
+./createFileSystem.sh <percentage full>
 
 eg
-./createFileSystem 25
-./createFileSystem 50
-./createFileSystem 75
+./createFileSystem.sh 25
+./createFileSystem.sh 50
+./createFileSystem.sh 75
 
 
 
@@ -15,7 +15,7 @@ The folder contains scripts to generate commands to create files and directories
 
 script 1:
 
-./createFileAndDir <numDir> <numFiles>
+./createFileAndDir.sh <numDir> <numFiles>
 
 The script considers TestFS file system to have the following configuration:
 
@@ -40,26 +40,26 @@ file3 ... file<numFiles> files in /
 
 To generate a 25 % full filesytem, we can give input as
 
-./createFileAndDir 16 16 # since 25% of inodes i.e. 32 inodes out of 128 need to be populated
+./createFileAndDir.sh 16 16 # since 25% of inodes i.e. 32 inodes out of 128 need to be populated
 
 To generate a 50 % full filesytem, we can give input as
 
-./createFileAndDir 32 32
+./createFileAndDir.sh 32 32
 
 To generate a 75 % full filesystem
 
-./createFileAndDir 48 48 
+./createFileAndDir.sh 48 48 
 
 To generate a 90 % full filesystem
 
-./createFileAndDir 58 58
+./createFileAndDir.sh 58 58
 
 
 ==========================================================================================================
 
 script 2:
 
-./generateData <numDir> <numFiles> <numDataBlocks> <mode>
+./generateData.sh <numDir> <numFiles> <numDataBlocks> <mode>
 
 This file generates data to write to numFiles. numDir is required to know if files exist
 as multi-level directories. 
@@ -78,19 +78,15 @@ a) the REMAINING_BYTES < numFiles, in which case, it will write 1 byte to each o
 b) REMAINING_BYTES < BLOCK_SIZE. in which case, it stops writing REMAINING_BYTES/2 but writes 
 floor (REMAINING_BYTES / numFiles) to each of the files.
 
-for creating 25% full file system:
+For creating 25% full file system:
+	./generateData.sh 16 16 128
 
-./generateData 16 16 128
+50% file system:
+	./generateData.sh 32 32 256
 
-50% file system
+75% file system:
+	./generateData.sh 48 48 384
 
-./generateData 32 32 256
-
-75% file system
-
-./generateData 48 48 384
-
-90% file system
-
-./generateData 58 58 451
+90% file system:
+	./generateData.sh 58 58 451
 
