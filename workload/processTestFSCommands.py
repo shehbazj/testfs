@@ -1,4 +1,11 @@
 import sys
+import argparse
+
+parser = argparse.ArgumentParser(description='Generate statistics for a TestFS workload.')
+parser.add_argument('--verbose', dest='VERBOSE', const=True, default=False,
+                    nargs='?', help='Print debug information.')
+
+args = parser.parse_args()
 
 BLOCK_SIZE = 64
 
@@ -107,9 +114,6 @@ if __name__ == "__main__":
             print "Unknown command: {}\nExiting...".format(cmd)
             sys.exit(-1)
 
-    print "Statistics:"
-    print "  -- Total bytes: {}".format(total_bytes_per_dir_or_file)
-
     # The number of inodes equals to the number of files and directories (keys)
     # stored inside the directory.
     total_inodes = len(total_bytes_per_dir_or_file.keys())
@@ -130,6 +134,10 @@ if __name__ == "__main__":
 
     # There is at least direct pointer for the '/' (root) directory.
     assert(total_direct_pointers != 0)
+
+    print "Statistics:"
+    if args.VERBOSE:
+        print "  -- Total bytes: {}".format(total_bytes_per_dir_or_file)
 
     print "  -- Total inodes: {}".format(total_inodes)
     print "  -- Total direct pointers: {}".format(total_direct_pointers)
