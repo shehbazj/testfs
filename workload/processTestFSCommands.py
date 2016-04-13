@@ -118,11 +118,12 @@ if __name__ == "__main__":
     # stored inside the directory.
     total_inodes = len(total_bytes_per_dir_or_file.keys())
 
-    # Initialize both counters.
-    total_direct_pointers = 0
+    # The superblock contains 5 integer fields that are used as
+    # on-disk pointers.
+    total_direct_pointers = 5
     total_indirect_pointers = 0
 
-    for file, size in total_bytes_per_dir_or_file.iteritems():
+    for _, size in total_bytes_per_dir_or_file.iteritems():
         # If the size of the file is larger than 4 * BLOCK_SIZE
         # then, an indirect block will be used.
         if size > (4 * BLOCK_SIZE):
@@ -133,7 +134,7 @@ if __name__ == "__main__":
             total_direct_pointers += 1
 
     # There is at least direct pointer for the '/' (root) directory.
-    assert(total_direct_pointers != 0)
+    assert(total_direct_pointers > 5)
 
     print "Statistics:"
     if args.VERBOSE:
