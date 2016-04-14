@@ -10,3 +10,4 @@ tags
 
 # Testfs stuff.
 testfs/*.bc
+testfs/*.dis

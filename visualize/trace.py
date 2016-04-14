@@ -13,6 +13,7 @@ if __name__ == "__main__":
     with open(args.trace_file, 'r') as f:
 
         relevant_lines = []
+        flag = None
 
         # Forward pass
         if args.b:
@@ -35,6 +36,11 @@ if __name__ == "__main__":
 
                     relevant |= set(sol)
                     relevant_lines.append(line)
+                    flag = True
+
+                if line.endswith("()") and flag:
+                    relevant_lines.append(line)
+                    flag = False
 
             for line in relevant_lines:
                 print line
