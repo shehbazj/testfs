@@ -47,8 +47,9 @@ class FSliceModulePass : public ModulePass {
   void labelVSets(void);
   void allocaVSetArray(void);
 
-  void runOnFunction(void);
+  void runOnFunction(const char *);
   void runOnArgs(void);
+  void printFunctionName(const char *s);
   void runOnInstructions(void);
 
   void runOnLoad(BasicBlock *B, LoadInst *LI);
@@ -97,7 +98,8 @@ class FSliceModulePass : public ModulePass {
   Type *IntPtrTy;
   Type *VoidTy;
   Type *VoidPtrTy;
-  Instruction *AfterAlloca;
+  Instruction *AfterAlloca;// first instruction in a function.
+			   // this instruction is always entry
 
   std::map<Argument *, VSet *> ArgToVSet;
   std::vector<IInfo> IIs;
@@ -148,14 +150,14 @@ bool FSliceModulePass::runOnModule(Module &M_) {
         F->setName("__fslice_calloc");
       }
     } else {
-      runOnFunction();
+      runOnFunction(F->getName().data());
     }
   }
   return true;
 }
 
 // Instrument every instruction in a function.
-void FSliceModulePass::runOnFunction(void) {
+void FSliceModulePass::runOnFunction(const char* s) {
   numVSets = 0;
   collectInstructions();
   initVSets();
@@ -163,6 +165,7 @@ void FSliceModulePass::runOnFunction(void) {
   labelVSets();
   allocaVSetArray();
   runOnArgs();
+  printFunctionName(s);
   runOnInstructions();
   ArgToVSet.clear();
   IIs.clear();
@@ -280,6 +283,17 @@ void FSliceModulePass::runOnArgs(void) {
       IList.insert(AfterAlloca, new StoreInst(T, TA));
     }
   }
+}
+
+// Insert function to print Function Name.
+void FSliceModulePass::printFunctionName(const char * s){
+	if(!AfterAlloca) return;
+	if(!s) return;
+	auto &IList = AfterAlloca->getParent()->getInstList();
+  	auto FunName = CreateString(s);
+	auto PrintFunc = CreateFunc(VoidPtrTy, "__fslice_print_func","", FunName->getType());
+	auto PR = CallInst::Create(PrintFunc, {FunName});
+	IList.insert(AfterAlloca, PR); 	
 }
 
 // Instrument the original instructions.

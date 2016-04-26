@@ -340,6 +340,11 @@ extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
   }
 }
 
+extern "C" void __fslice_print_func(void *ptr) {
+	if(ptr!=NULL)
+  std::cerr << (char *)ptr << "()" << std::endl;
+}
+
 // Mark some memory as a block.
 // S.J. if the block that is being written is already tainted, write trace.
 // if the block is not tainted, continue.
