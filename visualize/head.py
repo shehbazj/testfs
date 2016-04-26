@@ -7,9 +7,14 @@ parser = argparse.ArgumentParser(description='Calculate output graph.')
 parser.add_argument('--metadata', dest='PRINT_METADATA', const=True, default=False,
                     nargs='?', help='Print metadata.')
 parser.add_argument('--verbose', dest='VERBOSE', const=True, default=False,
+                    nargs='?', help='Print information in detail.')
+parser.add_argument('--debug', dest='DEBUG', const=True, default=False,
                     nargs='?', help='Print debug information.')
 
 args = parser.parse_args()
+
+# Constants.
+POINTER_SIZE = 4
 
 # Data types.
 pointerList = collections.defaultdict(list)
@@ -28,6 +33,7 @@ class Base(object):
         self.size = 1
         self.byte_sources = {}
         self.taintID = taintID
+        self.seen = False
 
     def __getitem__(self, byte):
         self.size = max(self.size, byte + 1)
@@ -71,12 +77,12 @@ class Select(Base):
         if self.seen:
             return
 
+        self.seen = True
+
         if isinstance(self.parent, B):
             self.parent.markPointer(self.byte, block_number)
         else:
             self.parent.markPointers(block_number)
-
-        self.seen = True
 
     def Print(self, next, edges):
         next.add(self.parent)
@@ -103,6 +109,10 @@ class A(Base):
         self.right = b
 
     def markPointers(self, block_number):
+        if self.seen:
+            return
+
+        self.seen = True
         self.left.markPointers(block_number)
         self.right.markPointers(block_number)
 
@@ -132,6 +142,30 @@ class O(Base):
         self.size = len(self.bytes)
 
     def markPointers(self, block_number):
+        # If the object has already been processed, then return.
+        if self.seen:
+            return
+
+        # Check for pointers only in objects whose size equals to POINTER_SIZE.
+        if self.size % POINTER_SIZE != 0:
+            return
+
+        # Verify that the specified objects contains four consecutive bytes
+        # that correspond to the same taint ID.
+        for i in xrange(1, len(self.bytes)):
+            # The taint ID must be the same in all POINTER_SIZE bytes.
+            if self.bytes[i].taintID != self.bytes[i-1].taintID:
+                self.seen = True
+                return
+
+            # All POINTER_SIZE bytes must be consecutive.
+            if (self.bytes[i].byte - 1) != self.bytes[i-1].byte:
+                self.seen = True
+                return
+
+        # Mark the object as processed, in order to speed up the recursion.
+        self.seen = True
+
         for i in xrange(0, self.size):
             self.__getitem__(i).markPointers(block_number)
 
@@ -173,9 +207,10 @@ class B(Base):
         if isinstance(val.parent, V):
             valueSet[(self.nr * self.size) + byte] = val.parent.val
 
-        if isinstance(val.parent, D):
-            if args.VERBOSE:
-                print "Inside block {} with offset {} and value {} and {}".format(self.nr, byte, val.taintID, val.parent.getByte(byte).parent.taintID)
+        elif isinstance(val.parent, D):
+            if args.DEBUG:
+                print "[DEBUG, {}]: Inside block {} with offset {} and value {} and {}".\
+                    format(time.time(), self.nr, byte, val.taintID, val.parent.getByte(byte).parent.taintID)
 
             if val.parent.getByte(val.byte).parent.getName() == 'N':
                 nameSet.add((self.nr * self.size) + byte)
@@ -184,14 +219,25 @@ class B(Base):
             else:
                 abstractDataSet.add((self.nr * self.size) + byte)
                 self.data_bytes += 1
+        else:
+            if args.DEBUG:
+                print "[DEBUG, {}]: Ignoring type {} in a block's assignment operator.".\
+                    format(time.time(), val.parent.getName())
 
     def markPointer(self, byte, block_number):
         disk_offset = (self.size * self.nr) + byte
         pointerList[block_number].append(disk_offset)
-        pointerSet.add(disk_offset)
 
-        if args.VERBOSE:
-            print "[{} INFO]: Byte {} was marked as part of a pointer.".format(time.time(), disk_offset)
+        if args.DEBUG:
+            if disk_offset in pointerSet:
+                print "[DEBUG, {}]: Byte {} is already marked as part of a pointer.".\
+                    format(time.time(), disk_offset)
+
+        pointerSet.add(disk_offset)
+        if args.DEBUG:
+            print "[DEBUG, {}]: Byte {} was marked as part of a pointer.".format(time.time(), disk_offset)
+            print "[DEBUG, {}]: Byte {} in block {} with taintID {} points to block {}".\
+                format(time.time(), byte, self.nr, self.taintID, block_number)
 
     def isDataBlock(self):
         if self.name_bytes > 0:
@@ -285,13 +331,25 @@ def PrintBlocks():
                     data_blocks[nr] = block
 
         # print(pointerList)
-        print "PointerSet: {}".format(sorted(pointerSet))
-        print "NameSet: {}".format(nameSet)
-        print "AbstractSet: {}".format(abstractDataSet)
-        print "ValueSet: {}".format(valueSet)
+        total_pointers = len(pointerSet)
 
-        print "Blocks with directory entries: {}".format(directory_entry_blocks)
-        print "Datablocks: {}".format(data_blocks)
+        # The total number of bytes marked as on-disk pointers must be
+        # a multiple of POINTER_SIZE. Otherwise, catch the error and print
+        # the current bytes marked as on-disk pointers.
+        res = total_pointers % POINTER_SIZE
+        if res != 0:
+            print "Total pointers: {}".format(total_pointers)
+            print "PointerSet: {}".format(sorted(pointerSet))
+            assert(res == 0)
+
+        print "Total pointers: {}".format(total_pointers / POINTER_SIZE)
+        if args.VERBOSE:
+            print "PointerSet: {}".format(sorted(pointerSet))
+            print "NameSet: {}".format(nameSet)
+            print "AbstractSet: {}".format(abstractDataSet)
+            print "ValueSet: {}".format(valueSet)
+            print "Blocks with directory entries: {}".format(sorted(directory_entry_blocks.keys()))
+            print "Datablocks: {}".format(sorted(data_blocks.keys()))
 
         sys.exit(0)
 
