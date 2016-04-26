@@ -143,7 +143,7 @@ static int testfs_allocate_block(struct inode *in, char *block,
 	// successfully obtained a physical block.
 	if (phy_block_nr != 0)
 		return phy_block_nr;
-	// otherwise we will need to alocate a new physical block
+	// otherwise we will need to allocate a new physical block
 	if (log_block_nr < NR_DIRECT_BLOCKS) {
 		// initializes block buffer with 0.
 		// uses in->sb to allocate block in block freemap
@@ -335,7 +335,7 @@ int testfs_read_data(struct inode *in, int start, char *buf, const int size) {
 /* write data from buf[size] to inode in, from start to start+size.
  * return 0 on success.
  * return negative value on error. */
-/* TODO: on error, unallocate blocks */
+/* TODO: on error, deallocate blocks */
 int testfs_write_data(struct inode *in, int start, char *buf, const int size) {
 	char block[BLOCK_SIZE];
 	int b_offset = start % BLOCK_SIZE; /* dst offset in block for copy */

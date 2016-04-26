@@ -32,6 +32,7 @@ static struct {
         { "cat",        cmd_cat,        MAX_ARGS, },
 		{ "catr",       cmd_catr,       2, },
         { "write",      cmd_write,      2, },
+		{ "owrite",     cmd_owrite,		3, },
         { "checkfs",    cmd_checkfs,    1, },
         { "quit",    	cmd_quit,       1, },
         { NULL,         NULL}
