@@ -1,0 +1,37 @@
+POST-PROCESSING CONSISTS OF 2 PARTS:
+
+a) Normalization
+b) Pattern Match
+
+A) NORMALIZATION
+
+Once we have the taint trace, we normalize the backtrace for each of the blocks.
+
+1. extract the block number and the block number taint
+
+2. find backtrace for each of the block number taints (use ./visualize/trace.py -b <block_nr_taint_number>)
+
+3. normalize the backtrace:
+	Compaction:
+	a) remove redundant assignments - O[][][][] = O[][][][]
+	b) remove [][][][] which are constants and do not lead to blocks
+
+4. End result of normalization should be
+
+	BLOCK DESTINATION
+	add something1 something2
+	something1 = div something3 something4
+	something3 = constant something5
+	something4 = constant something6
+	something2 = BLOCK SOURCE 
+	BLOCK SOURCE
+
+where something* is a variable
+
+B) PATTERN MATCH
+
+
+C) RESULTS:
+
+Without Normalization: I get http://moss.stanford.edu/results/38307664/ which does not give us much similarity in terms of number of lines copied
+

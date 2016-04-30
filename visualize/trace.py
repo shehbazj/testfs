@@ -14,6 +14,7 @@ if __name__ == "__main__":
 
         relevant_lines = []
         flag = None
+	printFunctionNames = None
 
         # Forward pass
         if args.b:
@@ -36,11 +37,13 @@ if __name__ == "__main__":
 
                     relevant |= set(sol)
                     relevant_lines.append(line)
-                    flag = True
-
-                if line.endswith("()") and flag:
-                    relevant_lines.append(line)
-                    flag = False
+                    if printFunctionNames == True:
+                        flag = True
+		
+		if printFunctionNames == True:
+                    if line.endswith("()") and flag:
+                        relevant_lines.append(line)
+                        flag = False
 
             for line in relevant_lines:
                 print line

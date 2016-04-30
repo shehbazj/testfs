@@ -92,6 +92,39 @@ static Taint Load(uint64_t addr, uint64_t size) {
 
   auto &t = gObjects[obj_hash];
   if (t.id) return t;
+	
+	// avoid multiple taint assignments, if new taint and old taint 
+	// are of the same size
+
+	bool assignNewTaint = false;
+	uint32_t tid;
+	tid = gShadow[addr].id;
+	// check if taints for bytes addr to addr+size have same taint id
+  for (auto i = 1U; i < size; ++i) {
+    const auto mt = gShadow[addr + i];
+		if (tid != mt.id){
+			assignNewTaint = true;	
+			std::cerr << " #XXX assigned new taint id = " << tid << " taint id checked for = " << mt.id << std::endl;
+			break;
+		}
+  }
+
+	// check if previous taint size is not greater than size bytes
+	// that are loaded (sent as argument)
+	// first see if the next address byte is tainted. if yes, check if its
+	// id is same, but offset is not 0, since offset 0 would mean the next
+	// <addr+size, addr + 2*size -1> bytes have same type as <addr,addr+size-1>
+	if(!assignNewTaint){
+		if (gShadow.find(addr+size)!= gShadow.end() && 
+					gShadow[addr+size].id == tid && gShadow[addr+size].offset != 0){
+			std::cerr << " #YYY assigned new taint id = " << tid << " taint id checked for = " << gShadow[addr+size].id << std::endl;
+			assignNewTaint = true;
+		}
+	}
+
+	if(!assignNewTaint)
+		return gShadow[addr];
+
   t = {gId++, 0, false};
 #else
   Taint t = {gId++, 0, false};

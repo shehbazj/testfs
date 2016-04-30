@@ -14,6 +14,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <string>
 
 using namespace llvm;
 
@@ -50,6 +51,7 @@ class FSliceModulePass : public ModulePass {
   void runOnFunction(const char *);
   void runOnArgs(void);
   void printFunctionName(const char *s);
+  void printString(Instruction *I, const char *s);
   void runOnInstructions(void);
 
   void runOnLoad(BasicBlock *B, LoadInst *LI);
@@ -296,6 +298,18 @@ void FSliceModulePass::printFunctionName(const char * s){
 	IList.insert(AfterAlloca, PR); 	
 }
 
+// Insert function to print a string before I.
+void FSliceModulePass::printString(Instruction *I, const char * s){
+	return;
+	if(!AfterAlloca) return;
+	if(!s) return;
+	auto &IList = AfterAlloca->getParent()->getInstList();
+  	auto FunName = CreateString(s);
+	auto PrintFunc = CreateFunc(VoidPtrTy, "__fslice_print_func","", FunName->getType());
+	auto PR = CallInst::Create(PrintFunc, {FunName});
+	IList.insert(I, PR); 	
+}
+
 // Instrument the original instructions.
 void FSliceModulePass::runOnInstructions(void) {
   for (auto II : IIs) {
@@ -309,8 +323,8 @@ void FSliceModulePass::runOnInstructions(void) {
       runOnCall(II.B, CI);
     } else if (ReturnInst *RI = dyn_cast<ReturnInst>(II.I)) {
       runOnReturn(II.B, RI);
-    //} else if (UnaryInstruction *UI = dyn_cast<UnaryInstruction>(II.I)) {
-    //  runOnUnary(II.B, UI);
+    } else if (UnaryInstruction *UI = dyn_cast<UnaryInstruction>(II.I)) {
+      runOnUnary(II.B, UI);
     } else if (BinaryOperator *BI = dyn_cast<BinaryOperator>(II.I)) {
       runOnBinary(II.B, BI);
     }
