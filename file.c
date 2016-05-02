@@ -122,12 +122,16 @@ int cmd_write(struct super_block *sb, struct context *c) {
 	struct inode *in;
 	int size;
 	int ret = 0;
-	char * filename = c->cmd[1];
-	char * content = c->cmd[2];
+	char *filename = NULL;
+	char *content = NULL;
 
 	if (c->nargs != 3) {
 		return -EINVAL;
 	}
+
+	filename = c->cmd[1];
+	content = c->cmd[2];
+
 	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, filename);
 	if (inode_nr < 0)
 		return inode_nr;
@@ -141,6 +145,46 @@ int cmd_write(struct super_block *sb, struct context *c) {
 	ret = testfs_write_data(in, 0, content, size);
 	if (ret >= 0) {
 		testfs_truncate_data(in, size);
+	}
+	testfs_sync_inode(in);
+	testfs_tx_commit(sb, TX_WRITE);
+	out: testfs_put_inode(in);
+	return ret;
+}
+
+int cmd_owrite(struct super_block *sb, struct context *c) {
+	int inode_nr;
+	struct inode *in;
+	int size;
+	int ret = 0;
+	long offset;
+	char *filename = NULL;
+	char *content = NULL;
+	char *temp = NULL;
+
+	if (c->nargs != 4) {
+		return -EINVAL;
+	}
+
+	filename = c->cmd[1];
+	offset = strtol(c->cmd[2], &temp, 10);
+	if (*temp != '\0')
+		return -1;
+	content = c->cmd[3];
+
+	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, filename);
+	if (inode_nr < 0)
+		return inode_nr;
+	in = testfs_get_inode(sb, inode_nr);
+	if (testfs_inode_get_type(in) == I_DIR) {
+		ret = -EISDIR;
+		goto out;
+	}
+	size = strlen(content);
+	testfs_tx_start(sb, TX_WRITE);
+	ret = testfs_write_data(in, offset, content, size);
+	if (ret >= 0) {
+		testfs_truncate_data(in, size + offset);
 	}
 	testfs_sync_inode(in);
 	testfs_tx_commit(sb, TX_WRITE);

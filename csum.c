@@ -3,8 +3,6 @@
 #include "block.h"
 #include <assert.h>
 
-// TODO: add your code here
-
 /* returns 0 on error */
 int 
 testfs_get_csum(struct super_block *sb, int block_nr)

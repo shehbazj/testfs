@@ -138,7 +138,7 @@ static int testfs_add_dirent(struct inode *dir, char *name, int inode_nr) {
 		return ret;
 	assert(found || (p_offset == testfs_inode_get_size(dir)));
 	// writes directory information to file dir. enters name, length
-	// poffset contains the offset where to write (usually at the end)
+	// p_offset contains the offset where to write (usually at the end)
 	// dir = name of parent directory. name = name of newly created file/directory
 	// len = length of the string name + 1. inode_nr number of newly created
 	// file or directory.
@@ -478,10 +478,19 @@ int cmd_lsr(struct super_block *sb, struct context *c) {
 }
 
 int cmd_create(struct super_block *sb, struct context *c) {
-	if (c->nargs != 2) {
+	int i, ret;
+
+	if (c->nargs < 2) {
 		return -EINVAL;
 	}
-	return testfs_create_file_or_dir(sb, c->cur_dir, I_FILE, c->cmd[1]);
+
+	for (i = 1; i < c->nargs; i++) {
+		ret = testfs_create_file_or_dir(sb, c->cur_dir, I_FILE, c->cmd[i]);
+		if(ret < 0)
+			return ret;
+	}
+
+	return 0;
 }
 
 int cmd_stat(struct super_block *sb, struct context *c) {
