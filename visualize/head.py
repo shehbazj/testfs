@@ -147,7 +147,7 @@ class O(Base):
             return
 
         # Check for pointers only in objects whose size equals to POINTER_SIZE.
-        if self.size % POINTER_SIZE != 0:
+        if self.size != POINTER_SIZE:
             return
 
         # Verify that the specified objects contains four consecutive bytes
@@ -344,12 +344,13 @@ def PrintBlocks():
 
         print "Total pointers: {}".format(total_pointers / POINTER_SIZE)
         if args.VERBOSE:
-            print "PointerSet: {}".format(sorted(pointerSet))
+            # print "PointerSet: {}".format(sorted(pointerSet))
             print "NameSet: {}".format(nameSet)
             print "AbstractSet: {}".format(abstractDataSet)
             print "ValueSet: {}".format(valueSet)
             print "Blocks with directory entries: {}".format(sorted(directory_entry_blocks.keys()))
             print "Datablocks: {}".format(sorted(data_blocks.keys()))
+            print "{}".format(sorted(pointerSet))
 
         sys.exit(0)
 
