@@ -48,7 +48,8 @@ int cmd_catr(struct super_block *sb, struct context *c)
 {
 	char *cdir = ".";
 	int inode_nr;
-	struct inode *in, *tmp_inode;
+	struct inode *in;
+	struct inode *tmp_inode;
 	int offset = 0;
 	struct dirent *d;
 	int ret = 0;

@@ -68,7 +68,8 @@ int testfs_init_super_block(const char *file, int corrupt,struct super_block **s
 {
 	struct super_block *sb = malloc(sizeof(struct super_block));
 	char block[BLOCK_SIZE];
-	int ret, sock;
+	int ret;
+	int sock;
 
 	if (!sb) {
 		return -ENOMEM;
@@ -297,7 +298,8 @@ static int testfs_checkfs(struct super_block *sb, struct bitmap *i_freemap, stru
 
 int cmd_checkfs(struct super_block *sb, struct context *c) 
 {
-	struct bitmap *i_freemap, *b_freemap;
+	struct bitmap *i_freemap;
+	struct bitmap *b_freemap;
 	int ret;
 
 	if (c->nargs != 1) {

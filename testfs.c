@@ -61,7 +61,8 @@ static int cmd_quit(struct super_block *sb, struct context *c)
 
 static void handle_command(struct super_block *sb, struct context *c, char * name, char * args) 
 {
-	int i, j = 0;
+	int i;
+	int j = 0;
 	if (name == NULL)
 		return;
 

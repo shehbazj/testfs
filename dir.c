@@ -18,7 +18,8 @@ struct dirent *
 testfs_next_dirent(struct inode *dir, int *offset) 
 {
 	int ret;
-	struct dirent d, *dp;
+	struct dirent d;
+	struct dirent *dp;
 
 	assert(dir);
 	assert(testfs_inode_get_type(dir) == I_DIR);
@@ -191,7 +192,8 @@ static int testfs_remove_dirent_allowed(struct super_block *sb, int inode_nr)
 static int testfs_remove_dirent(struct super_block *sb, struct inode *dir, char *name) 
 {
 	struct dirent *d;
-	int p_offset, offset = 0;
+	int p_offset;
+	int offset = 0;
 	int inode_nr = -1;
 	int ret = -ENOENT;
 
@@ -492,7 +494,8 @@ int cmd_lsr(struct super_block *sb, struct context *c)
 
 int cmd_create(struct super_block *sb, struct context *c) 
 {
-	int i, ret;
+	int i;
+	int ret;
 
 	if (c->nargs < 2) {
 		return -EINVAL;
