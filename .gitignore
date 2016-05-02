@@ -43,3 +43,10 @@ mktestfs
 
 # Bytecode files
 *.bc
+
+# Disassembled Code
+*.ll
+*.dis
+
+# ctags
+tags
