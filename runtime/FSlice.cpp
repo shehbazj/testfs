@@ -159,6 +159,10 @@ static Taint Load(uint64_t addr, uint64_t size) {
 // If the address is already tainted. Print it.
 // If not, add a taint value to the address.
 
+// addr and phy_addr in Taint t are different
+// addr is in memory address. phy_addr is the 
+// address on disk
+
 static void Store(uint64_t addr, uint64_t size, Taint t) {
   SaveErrno save_errno;
   std::cerr << "# Invoking Store(" << addr << ", " << size << ", "
@@ -171,7 +175,10 @@ static void Store(uint64_t addr, uint64_t size, Taint t) {
                 << "[" << (t.offset + i) << "] # Store::is_obj equals true."
                 << std::endl;
     } else {
-      et = {t.id, t.offset + i, false, t.phy_addr}; // should be `taint.offset + i`?
+        if(t.phy_addr == NON_TAGGED_PHY_ADDR)
+      	  et = {t.id, t.offset + i, false, NON_TAGGED_PHY_ADDR}; // should be `taint.offset + i`?
+        else
+      	  et = {t.id, t.offset + i, false, t.phy_addr + i}; // should be `taint.offset + i`?
     }
   }
 }
@@ -228,15 +235,13 @@ extern "C" void __fslice_store_arg(uint64_t i, Taint taint) {
 
 extern "C" void *__fslice_memset(void *dst, int val, uint64_t size) {
 	SaveErrno save_errno;
+  std::cerr << "# Invoking __fslice_memset(" << dst << ", " << val << ", " << size << ")\n";
   const auto t = __fslice_load_arg(1); // from gArgs unoredered map, load 1st element's taint value
 					// into t, and then initialize gArgs[1] to 0,0,false.
-
   const auto daddr = reinterpret_cast<uint64_t>(dst);
   for (auto i = 0U; i < size; ++i) {
-		
-		gShadow[daddr + i] = t; 			// use the taint value and taint all elements till
-	}                                       // daddr+ size with taint id t.
-  std::cerr << "#DSTRUCT:"<< "Addr=" << t.phy_addr << ":Size|" << size << std::endl;
+      gShadow[daddr + i] = {t.id, t.offset + i, false, NON_TAGGED_PHY_ADDR};
+  }                                       // daddr+ size with taint id t.
   __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // gReturn is initialized with {0,0,false}
 	return memset(dst, val, size);          // initialize the address with val.
 					// the main purpose why memset was called!
@@ -252,9 +257,7 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
   const auto saddr = reinterpret_cast<uint64_t>(src);
   for (auto i = 0U; i < size; ++i) {
     const auto bt = gShadow[saddr + i];
-	if(gShadow.find(saddr+i) == gShadow.end())
-		std::cerr << "#XXX Did not find taint corresponding to address " << saddr+i << std::endl;
-    gShadow[daddr + i] = {bt.id, bt.offset, false,bt.phy_addr};
+    gShadow[daddr + i] = {bt.id, bt.offset, false,bt.phy_addr + i};
   }
   std::cerr << "#DSTRUCT:"<< "Addr=" << gShadow[daddr].phy_addr << ":Size|" << size << std::endl;
   __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize all gArgs. intialize gRet to 0,0,false
