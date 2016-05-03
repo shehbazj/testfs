@@ -15,6 +15,7 @@ if __name__ == "__main__":
         relevant_lines = []
         flag = None
 	printFunctionNames = None
+	#printFunctionNames = True
 
         # Forward pass
         if args.b:
@@ -22,7 +23,7 @@ if __name__ == "__main__":
             relevant = set([taint_str])
 
             for line in reversed(f.readlines()):
-                if line[0] == '#':
+                if line[0] == '#' and printFunctionNames != True:
                     continue
                 line = line.strip()
 
