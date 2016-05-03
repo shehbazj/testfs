@@ -23,6 +23,7 @@ fi
 
 if [[ -f $BNUM_TAINT_FILE ]]; then
 	rm $BNUM_TAINT_FILE	
+	touch $BNUM_TAINT_FILE
 fi
 
 if [[ -d $PROCESSING_DIR ]]; then
@@ -38,13 +39,6 @@ bnum_taint_tuple=""
 # creates a backtrace file containing trace of taint for block number
 
 createBlockVisualizeFile() {	
-	# takes taint trace file, generates trace lines as tuples <block number, block taint>
-	# we want unique <blockNumber, block number Taint> fields
-	# BlockTaint=B(BlockSize ,BlockNumber, BlockSizeTaint, Block number Taint)
-	# for each block, it now generates a valid python visualization file
-
-	cat /tmp/testfs.py | grep "B(64" | cut -d"(" -f2 | cut -d")" -f1 | cut -d "," -f2,4,5 | sort -u -t, -k 1,2 > $BNUM_TAINT_FILE
-	
 	blockNumber=`echo "$bnum_taint_tuple" | cut -d"," -f1`
 	blockTaint=`echo "$bnum_taint_tuple" | cut -d" " -f2`
 	echo "processing for blockNumber $blockNumber and blockTaint $blockTaint"
@@ -65,8 +59,16 @@ createBlockVisualizeFile() {
 # normalizes backtrace file. see README A.3, A.4
 #normalizeBackTraceFile() {
 #	
-#}
+#
 
+
+# takes taint trace file, generates trace lines as tuples <block number, block taint>
+# we want unique <blockNumber, block number Taint> fields
+# BlockTaint=B(BlockSize ,BlockNumber, BlockSizeTaint, Block number Taint)
+# for each block, it now generates a valid python visualization file
+
+cat /tmp/testfs.py | grep "B(64" | cut -d"(" -f2 | cut -d")" -f1 | cut -d "," -f2,4,5 | sort -u -t, -k 1,2 > $BNUM_TAINT_FILE
+	
 while read line
 do
 	bnum_taint_tuple=$line	

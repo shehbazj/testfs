@@ -10,6 +10,7 @@
 #include <vector>
 #include <cerrno>
 #include <sstream>
+#include <algorithm>
 
 #define NON_TAGGED_PHY_ADDR 999999
 // Attribute packed is for space compaction. Any object instance created for Taint 
@@ -65,6 +66,7 @@ static std::unordered_map<uint64_t,Taint> gObjects;
 
 static std::set<uint64_t> gPrintedBlocks;
 static std::unordered_map<uint64_t,Taint> gBlocks;
+static std::vector<uint32_t> gBlockTaintIds;
 static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
 // op = char value. every op has a <object, taint> value
 static std::unordered_map<const char *,std::unordered_map<uint64_t,Taint>> gBinaryOps;
@@ -127,6 +129,12 @@ static Taint Load(uint64_t addr, uint64_t size) {
 			std::cerr << " #YYY assigned new taint id = " << tid << " taint id checked for = " << gShadow[addr+size].id << std::endl;
 			assignNewTaint = true;
 		}
+	}
+
+	// check if Taint is a block taint. If yes, assign a new taint.
+	if(!assignNewTaint){	
+		if(std::find(gBlockTaintIds.begin(), gBlockTaintIds.end(),tid) != gBlockTaintIds.end())
+			assignNewTaint = true;
 	}
 
 	if(!assignNewTaint)
@@ -354,6 +362,7 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 #endif
 	if (!t.id) {
 		t = {gId++, 0, false, nr * size};
+		gBlockTaintIds.push_back(t.id);
 		const auto st = __fslice_load_arg(1);  // Taint for the size :-)
 		const auto nt = __fslice_load_arg(2);  // Taint for the block number :-)
 		std::cerr << "t" << t.id << "=B(" << size << "," << nr << ",t" << st.id
@@ -366,6 +375,7 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 	}
 #if BLOCKS_CACHE
 	gBlocks[nr] = t;
+	gBlockTaintIds.push_back(t.id);
 #endif
 	return t;
 }
@@ -463,6 +473,7 @@ extern "C" void __fslice_clear() {
 	gObjects.clear();
 	gValues.clear();
 	gBlocks.clear();
+	gBlockTaintIds.clear();
 	gPrevBlock.clear();
 	gBinaryOps.clear();
 	gId=1;		
