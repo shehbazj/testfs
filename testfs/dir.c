@@ -15,9 +15,11 @@
 /* allocates memory, caller should free */
 // offset is 0 initially.
 struct dirent *
-testfs_next_dirent(struct inode *dir, int *offset) {
+testfs_next_dirent(struct inode *dir, int *offset) 
+{
 	int ret;
-	struct dirent d, *dp;
+	struct dirent d;
+	struct dirent *dp;
 
 	assert(dir);
 	assert(testfs_inode_get_type(dir) == I_DIR);
@@ -51,7 +53,8 @@ testfs_next_dirent(struct inode *dir, int *offset) {
  * returns NULL on error.
  * allocates memory, caller should free. */
 static struct dirent *
-testfs_find_dirent(struct inode *dir, int inode_nr) {
+testfs_find_dirent(struct inode *dir, int inode_nr) 
+{
 	struct dirent *d;
 	int offset = 0;
 
@@ -80,7 +83,8 @@ testfs_find_dirent(struct inode *dir, int inode_nr) {
  */
 
 static int testfs_write_dirent(struct inode *dir, char *name, int len,
-		int inode_nr, int offset) {
+		int inode_nr, int offset) 
+{
 	int ret;
 	struct dirent *d = malloc(sizeof(struct dirent) + len);
 
@@ -104,7 +108,8 @@ static int testfs_write_dirent(struct inode *dir, char *name, int len,
  the new file or directories inode is dir.
  */
 
-static int testfs_add_dirent(struct inode *dir, char *name, int inode_nr) {
+static int testfs_add_dirent(struct inode *dir, char *name, int inode_nr) 
+{
 	struct dirent *d;
 	int p_offset = 0, offset = 0;
 	int found = 0;
@@ -148,7 +153,8 @@ static int testfs_add_dirent(struct inode *dir, char *name, int inode_nr) {
 }
 
 /* returns negative value if name within dir is not empty */
-static int testfs_remove_dirent_allowed(struct super_block *sb, int inode_nr) {
+static int testfs_remove_dirent_allowed(struct super_block *sb, int inode_nr) 
+{
 	struct inode *dir;
 	int offset = 0;
 	struct dirent *d;
@@ -183,10 +189,11 @@ static int testfs_remove_dirent_allowed(struct super_block *sb, int inode_nr) {
  deleted are set to -1.
  returns inode_nr of dirent removed
  returns negative value if name is not found */
-static int testfs_remove_dirent(struct super_block *sb, struct inode *dir,
-		char *name) {
+static int testfs_remove_dirent(struct super_block *sb, struct inode *dir, char *name) 
+{
 	struct dirent *d;
-	int p_offset, offset = 0;
+	int p_offset;
+	int offset = 0;
 	int inode_nr = -1;
 	int ret = -ENOENT;
 
@@ -225,8 +232,8 @@ static int testfs_remove_dirent(struct super_block *sb, struct inode *dir,
 	return ret;
 }
 
-static int testfs_create_empty_dir(struct super_block *sb, int p_inode_nr,
-		struct inode *cdir) {
+static int testfs_create_empty_dir(struct super_block *sb, int p_inode_nr, struct inode *cdir) 
+{
 	int ret;
 
 	assert(testfs_inode_get_type(cdir) == I_DIR);
@@ -245,8 +252,8 @@ static int testfs_create_empty_dir(struct super_block *sb, int p_inode_nr,
  dir is the inode corresponding to current directory.
  */
 
-static int testfs_create_file_or_dir(struct super_block *sb, struct inode *dir,
-		inode_type type, char *name) {
+static int testfs_create_file_or_dir(struct super_block *sb, struct inode *dir, inode_type type, char *name) 
+{
 	int ret = 0;
 	struct inode *in;
 	int inode_nr;
@@ -293,7 +300,8 @@ static int testfs_create_file_or_dir(struct super_block *sb, struct inode *dir,
 	return ret;
 }
 
-static int testfs_pwd(struct super_block *sb, struct inode *in) {
+static int testfs_pwd(struct super_block *sb, struct inode *in) 
+{
 	int p_inode_nr;
 	struct inode *p_in;
 	struct dirent *d;
@@ -323,7 +331,8 @@ static int testfs_pwd(struct super_block *sb, struct inode *in) {
  to which we need to cd. returns inode number corresponding
  to the destination path.
  */
-int testfs_dir_name_to_inode_nr(struct inode *dir, char *name) {
+int testfs_dir_name_to_inode_nr(struct inode *dir, char *name) 
+{
 	struct dirent *d;
 	int offset = 0;
 	int ret = -ENOENT;
@@ -340,11 +349,13 @@ int testfs_dir_name_to_inode_nr(struct inode *dir, char *name) {
 	return ret;
 }
 
-int testfs_make_root_dir(struct super_block *sb) {
+int testfs_make_root_dir(struct super_block *sb) 
+{
 	return testfs_create_file_or_dir(sb, NULL, I_DIR, NULL);
 }
 
-int cmd_cd(struct super_block *sb, struct context *c) {
+int cmd_cd(struct super_block *sb, struct context *c) 
+{
 	int inode_nr;
 	struct inode *dir_inode;
 
@@ -374,7 +385,8 @@ int cmd_cd(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_pwd(struct super_block *sb, struct context *c) {
+int cmd_pwd(struct super_block *sb, struct context *c) 
+{
 	if (c->nargs != 1) {
 		return -EINVAL;
 	}
@@ -384,7 +396,8 @@ int cmd_pwd(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-static int testfs_ls(struct inode *in, int recursive) {
+static int testfs_ls(struct inode *in, int recursive) 
+{
 	int offset = 0;
 	struct dirent *d;
 	// d gets the dirent stored in the inode.
@@ -420,7 +433,8 @@ static int testfs_ls(struct inode *in, int recursive) {
 	return 0;
 }
 
-int cmd_ls(struct super_block *sb, struct context *c) {
+int cmd_ls(struct super_block *sb, struct context *c) 
+{
 	int inode_nr;
 	struct inode *in;
 	char *cdir = ".";
@@ -449,7 +463,8 @@ int cmd_ls(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_lsr(struct super_block *sb, struct context *c) {
+int cmd_lsr(struct super_block *sb, struct context *c) 
+{
 	int inode_nr;
 	struct inode *in;
 	char *cdir = ".";
@@ -477,8 +492,10 @@ int cmd_lsr(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_create(struct super_block *sb, struct context *c) {
-	int i, ret;
+int cmd_create(struct super_block *sb, struct context *c) 
+{
+	int i;
+	int ret;
 
 	if (c->nargs < 2) {
 		return -EINVAL;
@@ -493,7 +510,8 @@ int cmd_create(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_stat(struct super_block *sb, struct context *c) {
+int cmd_stat(struct super_block *sb, struct context *c) 
+{
 	int inode_nr;
 	struct inode *in;
 	int i;
@@ -517,7 +535,8 @@ int cmd_stat(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_rm(struct super_block *sb, struct context *c) {
+int cmd_rm(struct super_block *sb, struct context *c) 
+{
 	int inode_nr;
 	struct inode *in;
 
@@ -541,7 +560,8 @@ int cmd_rm(struct super_block *sb, struct context *c) {
 	return 0;
 }
 
-int cmd_mkdir(struct super_block *sb, struct context *c) {
+int cmd_mkdir(struct super_block *sb, struct context *c) 
+{
 	if (c->nargs != 2) {
 		return -EINVAL;
 	}
