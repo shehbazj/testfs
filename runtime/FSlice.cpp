@@ -140,7 +140,7 @@ static Taint Load(uint64_t addr, uint64_t size) {
 	if(!assignNewTaint)
 		return gShadow[addr];
 
-  t = {gId++, 0, false};
+  t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
 #else
   Taint t = {gId++, 0, false,NON_TAGGED_PHY_ADDR};
 #endif
@@ -252,6 +252,8 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
   const auto saddr = reinterpret_cast<uint64_t>(src);
   for (auto i = 0U; i < size; ++i) {
     const auto bt = gShadow[saddr + i];
+	if(gShadow.find(saddr+i) == gShadow.end())
+		std::cerr << "#XXX Did not find taint corresponding to address " << saddr+i << std::endl;
     gShadow[daddr + i] = {bt.id, bt.offset, false,bt.phy_addr};
   }
   std::cerr << "#DSTRUCT:"<< "Addr=" << gShadow[daddr].phy_addr << ":Size|" << size << std::endl;
@@ -280,30 +282,30 @@ extern "C" void __fslice_bzero(void *dst, uint64_t size) {
 extern "C" void *__fslice_malloc(uint64_t size) {
   auto ptr = calloc(1, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
-  Taint t = {gId++, 0};
+  Taint t = {gId++, 0,false,NON_TAGGED_PHY_ADDR};
 
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ")" << std::endl;
 
   for (auto i = 0U; i < size; ++i) {
-    gShadow[addr + i] = {t.id, i, MEM}; // MEM -treat heap allocated objects as separate objects
+    gShadow[addr + i] = {t.id, i, MEM, t.phy_addr}; // MEM -treat heap allocated objects as separate objects
   }					// by default it is false.
-  __fslice_store_ret({0,0,false});	// init gArgs list and gReturn with 0,0,false
+  __fslice_store_ret({0,0,false, NON_TAGGED_PHY_ADDR});	// init gArgs list and gReturn with 0,0,false
   return ptr;
 }
 
 extern "C" void *__fslice_calloc(uint64_t num, uint64_t size) {
   auto ptr = calloc(num, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
-  Taint t = {gId++, 0};
+  Taint t = {gId++, 0,false, NON_TAGGED_PHY_ADDR};
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ",t"
             << __fslice_load_arg(1).id << ")" << std::endl;
 
   for (auto i = 0U; i < num * size; ++i) {
-    gShadow[addr + i] = {t.id, i, MEM};
+    gShadow[addr + i] = {t.id, i, MEM, t.phy_addr};
   }
-  __fslice_store_ret({0,0,false});	// init gArgs list and gReturn with 0,0,false
+  __fslice_store_ret({0,0,false, NON_TAGGED_PHY_ADDR});	// init gArgs list and gReturn with 0,0,false
   return ptr;
 }
 
@@ -312,7 +314,7 @@ extern "C" Taint __fslice_value(uint64_t val) {
 #if VALUE_CACHE
 	auto &t = gValues[val];
 	if (/*val && */ !t.id) {
-		t = { gId++, 0, false };
+		t = { gId++, 0, false, NON_TAGGED_PHY_ADDR };
 		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # "
 				<< TaintAsString(t) << std::endl;
 	}
@@ -320,7 +322,7 @@ extern "C" Taint __fslice_value(uint64_t val) {
 	return t;
 #else
 	/*if (val) { */
-		Taint t = {gId++, 0, false};
+		Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
 		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # " << TaintAsString(t) << std::endl;
 		return t;
 	/*} else {
@@ -443,7 +445,7 @@ extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
 			<< std::endl;
 
   for (auto i = 0U; i < len; ++i) {
-    gShadow[addr + i] = {t.id, i, false, NON_TAGGED_PHY_ADDR};
+    gShadow[addr + i] = {t.id, i, false, t.phy_addr};
   }
 }
 
@@ -463,7 +465,7 @@ extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
       std::cerr << "t" << t.id << "[" << i << "]=t" << bt.id
                 << "[" << bt.offset << "]" << std::endl;
     }
-    bt = {t.id, i, false, NON_TAGGED_PHY_ADDR};	// XXX unsure about non_tagged_phy_addr
+    bt = {t.id, i, false, t.phy_addr};	// XXX unsure about non_tagged_phy_addr
   }
 }
 
