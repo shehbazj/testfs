@@ -210,6 +210,10 @@ void FSliceModulePass::initVSets(void) {
 }
 
 // Combine value sets.
+// go through each of the Instructions. Check the incoming 
+// nodes of each of the instructions. If the incoming vertex is
+// not from a constant, combine the incoming value with the Vset corresponding
+// to the Instruction that you just read.
 void FSliceModulePass::combineVSets(void) {
   for (auto &II : IIs) {
     auto I = II.I;
@@ -228,6 +232,8 @@ void FSliceModulePass::combineVSets(void) {
 }
 
 // Combine two value sets. This implements disjoint set union.
+// Build a chain/tree. Point Vset to the Vset which has lower value.
+// parent --> child.
 void FSliceModulePass::combineVSet(VSet *VSet1, VSet *VSet2) {
   VSet1 = getVSet(VSet1);
   VSet2 = getVSet(VSet2);
@@ -258,6 +264,8 @@ void FSliceModulePass::labelVSets(void) {
 
 // Allocate an array to hold the slice taints for each variable in this
 // function.
+// ilist insert inserts a new element at the beginning of the list
+// keep moving child pointers point to 1 root parent.
 void FSliceModulePass::allocaVSetArray(void) {
   auto &B = F->getEntryBlock();
   auto &IList = B.getInstList();

@@ -11,6 +11,11 @@
 #include <cerrno>
 #include <sstream>
 
+#define NON_TAGGED_PHY_ADDR 999999
+// Attribute packed is for space compaction. Any object instance created for Taint 
+// requires exactly 64 bits. If packed was not used, each attribute of the structure
+// would take 4 bytes.
+
 template<typename T>
 std::string tostring(const T& t) {
 	std::ostringstream ss;
@@ -24,8 +29,10 @@ std::string tostring(const T& t) {
 
 struct Taint {
   uint64_t id:32;
-  uint64_t offset:31;
-  bool is_obj:1;
+  uint64_t offset:31;	// S.J. number of bytes following the address that 
+			// have the same taint value as start address.
+  bool is_obj:1;	// S.J. Is true for objects allocated on heap
+	uint64_t phy_addr;
 } __attribute__((packed));
 
 struct SaveErrno {
@@ -47,8 +54,8 @@ struct SaveErrno {
 // Treat heap-allocated memory objects as special intermediate objects.
 #define MEM false
 
-static Taint gArgs[16] = {{0,0}};
-static Taint gReturn = {0,0};
+static Taint gArgs[16] = {{0,0,false,NON_TAGGED_PHY_ADDR}};
+static Taint gReturn = {0,0,false,NON_TAGGED_PHY_ADDR};
 
 // Unordered map - helps retrieve Taint values faster. Does not sort the values,
 // keeps buckets built in the form of a hash.
@@ -56,13 +63,14 @@ static std::unordered_map<uint64_t,Taint> gShadow;
 static std::unordered_map<uint64_t,Taint> gValues;
 static std::unordered_map<uint64_t,Taint> gObjects;
 
+static std::set<uint64_t> gPrintedBlocks;
 static std::unordered_map<uint64_t,Taint> gBlocks;
-//static std::set<uint64_t> gPrintedBlocks;
-//static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
-
+static std::unordered_map<uint64_t,uint64_t> gPrevBlock;
 // op = char value. every op has a <object, taint> value
 static std::unordered_map<const char *,std::unordered_map<uint64_t,Taint>> gBinaryOps;
 static unsigned gId = 1;
+
+extern "C" Taint __fslice_value(uint64_t);
 
 static std::string TaintAsString(Taint t) {
 	return "Taint<" + tostring(t.id) + ", " + tostring(t.offset) + ", "
@@ -70,8 +78,7 @@ static std::string TaintAsString(Taint t) {
 }
 
 // Load a taint from the shadow memory.
-
-// S.J. We create an object hash from the address given to us. We then
+// We create an object hash from the address given to us. We then
 // search for the object hash in our Shadow unordered list. If we get it, we 
 // return the taint value. If not, we create a taint value and print that 
 // out to the graph file.
@@ -79,7 +86,7 @@ static std::string TaintAsString(Taint t) {
 
 static Taint Load(uint64_t addr, uint64_t size) {
   SaveErrno save_errno;
-  std::cerr << "# Invoking Load(" << addr << ", " << size << ")\n";
+//std::cerr << "# Invoking Load(" << addr << ", " << size << ")\n";
 
 #if CACHE
   // So this isn't super great, but it's sufficient for now. Hopefully there
@@ -127,7 +134,7 @@ static Taint Load(uint64_t addr, uint64_t size) {
 
   t = {gId++, 0, false};
 #else
-  Taint t = {gId++, 0, false};
+  Taint t = {gId++, 0, false,NON_TAGGED_PHY_ADDR};
 #endif
   auto sep = ",";
   std::cerr << "t" << t.id << "=O(" << t.id;
@@ -156,7 +163,7 @@ static void Store(uint64_t addr, uint64_t size, Taint t) {
                 << "[" << (t.offset + i) << "] # Store::is_obj equals true."
                 << std::endl;
     } else {
-      et = {t.id, t.offset + i, false};  // should be `taint.offset + i`?
+      et = {t.id, t.offset + i, false, t.phy_addr}; // should be `taint.offset + i`?
     }
   }
 }
@@ -186,7 +193,7 @@ LOAD_STORE(64)
 extern "C" Taint __fslice_load_ret(void) {
   memset(gArgs, 0, sizeof gArgs);
   const auto t = gReturn;
-  gReturn = {0,0,false};
+  gReturn = {0,0,false,NON_TAGGED_PHY_ADDR};
   return t;
 }
 
@@ -194,35 +201,37 @@ extern "C" Taint __fslice_load_ret(void) {
 
 extern "C" void __fslice_store_ret(Taint taint) {
   memset(gArgs, 0, sizeof gArgs);
-  gReturn = {taint.id, taint.offset, false};
+  gReturn = {taint.id, taint.offset, false, taint.phy_addr};
 }
 
 // get tainted value from gArgs. return tainted value. 
 
 extern "C" Taint __fslice_load_arg(uint64_t i) {
   const auto t = gArgs[i];
-  gArgs[i] = {0,0,false};
+  gArgs[i] = {0,0,false,NON_TAGGED_PHY_ADDR};
   return t;
 }
 
 // store tainted value in gArgs ordered list.
 
 extern "C" void __fslice_store_arg(uint64_t i, Taint taint) {
-  gArgs[i] = {taint.id, taint.offset, false};
+  gArgs[i] = {taint.id, taint.offset, false, taint.phy_addr};
 }
 
 extern "C" void *__fslice_memset(void *dst, int val, uint64_t size) {
 	SaveErrno save_errno;
-	const auto t = __fslice_load_arg(1); 	// from gArgs unordered map, load 1st element's taint value
-											// into t, and then initialize gArgs[1] to 0,0,false.
+  const auto t = __fslice_load_arg(1); // from gArgs unoredered map, load 1st element's taint value
+					// into t, and then initialize gArgs[1] to 0,0,false.
 
-	const auto daddr = reinterpret_cast<uint64_t>(dst);
-	for (auto i = 0U; i < size; ++i) {
+  const auto daddr = reinterpret_cast<uint64_t>(dst);
+  for (auto i = 0U; i < size; ++i) {
+		
 		gShadow[daddr + i] = t; 			// use the taint value and taint all elements till
 	}                                       // daddr+ size with taint id t.
-	__fslice_store_ret( { 0, 0, false }); 	// gReturn is initialized with {0,0,false}
+  std::cerr << "#DSTRUCT:"<< "Addr=" << t.phy_addr << ":Size|" << size << std::endl;
+  __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // gReturn is initialized with {0,0,false}
 	return memset(dst, val, size);          // initialize the address with val.
-											// the main purpose why memset was called!
+					// the main purpose why memset was called!
 }
 
 // taint destination address with the same value as that at source
@@ -235,10 +244,10 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
   const auto saddr = reinterpret_cast<uint64_t>(src);
   for (auto i = 0U; i < size; ++i) {
     const auto bt = gShadow[saddr + i];
-    gShadow[daddr + i] = {bt.id, bt.offset, false};
+    gShadow[daddr + i] = {bt.id, bt.offset, false,bt.phy_addr};
   }
-
-  __fslice_store_ret({0,0,false}); // initialize all gArgs. intialize gRet to 0,0,false
+  std::cerr << "#DSTRUCT:"<< "Addr=" << gShadow[daddr].phy_addr << ":Size|" << size << std::endl;
+  __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize all gArgs. intialize gRet to 0,0,false
   return memmove(dst, src, size);
 }
 
@@ -254,9 +263,9 @@ extern "C" char *__fslice_strcpy(char *dst, const char *src) {
 extern "C" void __fslice_bzero(void *dst, uint64_t size) {
   const auto daddr = reinterpret_cast<uint64_t>(dst);
   for (auto i = 0U; i < size; ++i) {
-    gShadow[daddr + i] = {0,0,false};
+    gShadow[daddr + i] = {0,0,false,NON_TAGGED_PHY_ADDR};
   }
-  __fslice_store_ret({0,0,false}); // initialize gArgs as false. initialize gReturn as false
+  __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize gArgs as false. initialize gReturn as false
   memset(dst, 0, size);
 }
 
@@ -279,7 +288,6 @@ extern "C" void *__fslice_calloc(uint64_t num, uint64_t size) {
   auto ptr = calloc(num, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
   Taint t = {gId++, 0};
-
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ",t"
             << __fslice_load_arg(1).id << ")" << std::endl;
@@ -322,17 +330,22 @@ extern "C" Taint __fslice_op2(const char *op, Taint t1, Taint t2) {
   const auto id = t1.id | (static_cast<uint64_t>(t2.id) << 32);
   auto &t = gBinaryOps[op][id];
   if (!t.id) {
-    t = {gId++, 0, false};
+    t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
     std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
               << ",t" << t2.id << ", " << t.id << ")" << std::endl;
   }
 #else
-  Taint t = {gId++, 0, false};
+  Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
             << ",t" << t2.id << ", " << t.id << ")" << std::endl;
 #endif
   return t;
 }
+
+// nr - physical address number of the block.
+// size - granularity at which data is being read into memory. 
+// Only in GetBlock does the tainting of actual data blocks happen.
+
 
 static Taint GetBlock(uint64_t size, uint64_t nr) {
 	Taint t = { 0, 0, false };
@@ -340,13 +353,13 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 	t = gBlocks[nr];
 #endif
 	if (!t.id) {
-		t = {gId++, 0, false};
+		t = {gId++, 0, false, nr * size};
 		const auto st = __fslice_load_arg(1);  // Taint for the size :-)
 		const auto nt = __fslice_load_arg(2);  // Taint for the block number :-)
 		std::cerr << "t" << t.id << "=B(" << size << "," << nr << ",t" << st.id
 				<< ",t" << nt.id << ", " << t.id << ") # GetBlock(" << size
 				<< ", " << nr << ")" << std::endl;
-		__fslice_store_ret( { 0, 0, false });
+		__fslice_store_ret( { 0, 0, false, NON_TAGGED_PHY_ADDR});
 	} else {
 		std::cerr << "# Block " << nr << " is already tainted as: t" << t.id
 				<< std::endl;
@@ -369,17 +382,17 @@ extern "C" void __fslice_read_block(uint64_t addr, uint64_t size, uint64_t nr) {
 
   auto t = GetBlock(size, nr);
   for (auto i = 0U; i < size; ++i) {
-    gShadow[addr + i] = {t.id, i, false};
+    gShadow[addr + i] = {t.id, i, false, (nr *size) + i};
   }
 }
 
 extern "C" void __fslice_print_func(void *ptr) {
 	if(ptr!=NULL)
-  std::cerr << (char *)ptr << "()" << std::endl;
+  std::cerr << "# "<< (char *)ptr << "()" << std::endl;
 }
 
 // Mark some memory as a block.
-// S.J. if the block that is being written is already tainted, write trace.
+// if the block that is being written is already tainted, write trace.
 // if the block is not tainted, continue.
 
 extern "C" void __fslice_write_block(uint64_t addr, uint64_t size, uint64_t nr) {
@@ -415,12 +428,12 @@ extern "C" void __fslice_write_block(uint64_t addr, uint64_t size, uint64_t nr) 
 
 extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
-  Taint t = {gId++, 0};
+  Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   std::cerr << "t" << t.id << "=N(" << len << ", " << t.id << ")"
 			<< std::endl;
 
   for (auto i = 0U; i < len; ++i) {
-    gShadow[addr + i] = {t.id, i, false};
+    gShadow[addr + i] = {t.id, i, false, NON_TAGGED_PHY_ADDR};
   }
 }
 
@@ -430,7 +443,7 @@ extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
 // generated for all accessed data.
 extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
-  Taint t = {gId++, 0};
+  Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   std::cerr << "t" << t.id << "=D(" << len << ", " << t.id << ")"
 			<< std::endl;
 
@@ -440,6 +453,17 @@ extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
       std::cerr << "t" << t.id << "[" << i << "]=t" << bt.id
                 << "[" << bt.offset << "]" << std::endl;
     }
-    bt = {t.id, i, false};
+    bt = {t.id, i, false, NON_TAGGED_PHY_ADDR};	// XXX unsure about non_tagged_phy_addr
   }
+}
+
+extern "C" void __fslice_clear() {
+//	printf("%s\n", __func__);
+	gShadow.clear();
+	gObjects.clear();
+	gValues.clear();
+	gBlocks.clear();
+	gPrevBlock.clear();
+	gBinaryOps.clear();
+	gId=1;		
 }
