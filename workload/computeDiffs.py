@@ -1,4 +1,7 @@
 import sys
+import re
+
+BLOCK_SIZE = 64
 
 if __name__ == "__main__":
 
@@ -10,23 +13,25 @@ if __name__ == "__main__":
     # Read the offsets from the first file and store them in a dictionary.
     with open(sys.argv[1]) as f_1:
         input_offsets_1 = ''.join(f_1.readlines()).strip()
-        offsets_1 = input_offsets_1.split(",")
+        offsets_1 = re.findall(r"[\w']+", input_offsets_1)
         offsets_1 = set(offsets_1)
 
     # Read the offsets from the second file and store them in a dictionary.
     with open(sys.argv[2]) as f_2:
-        input_offsets_2 = ''.join(f_2.readlines()).strip()
-        offsets_2 = input_offsets_2.split(",")
+        input_offsets_2 = ''.join(f_2.readlines())
+        offsets_2 = re.findall(r"[\w']+", input_offsets_2)
         offsets_2 = set(offsets_2)
 
     # Calculate which offsets exist only in the first file.
-    print "Offsets not found in the 2nd file..."
-    for offset in offsets_1:
+    print "Offsets not found in file {}...".format(sys.argv[2])
+    for offset in sorted(offsets_1):
         if offset not in offsets_2:
-            print "\t{}".format(offset)
+            offset = int(offset)
+            print "\t{} = {} * {} + {}".format(offset, BLOCK_SIZE, offset / BLOCK_SIZE, offset % BLOCK_SIZE)
 
     # Calculate which offsets exist only in the second file.
-    print "\nOffsets not found in the 1st file..."
-    for offset in offsets_2:
+    print "\nOffsets not found in file {}...".format(sys.argv[1])
+    for offset in sorted(offsets_2):
         if offset not in offsets_1:
-            print "\t{}".format(offset)
+            offset = int(offset)
+            print "\t{} = {} * {} + {}".format(offset, BLOCK_SIZE, offset / BLOCK_SIZE, offset % BLOCK_SIZE)

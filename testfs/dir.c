@@ -362,10 +362,17 @@ int cmd_cd(struct super_block *sb, struct context *c)
 	if (c->nargs != 2) {
 		return -EINVAL;
 	}
-	// get destination directories inode number
-	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, c->cmd[1]);
-	if (inode_nr < 0)
-		return inode_nr;
+
+	/* Special case where the specified directory equals to root. */
+	if(!strcmp(c->cmd[1], "/"))
+		inode_nr = 0;
+	else {
+		// get destination directories inode number
+		inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, c->cmd[1]);
+		if (inode_nr < 0)
+			return inode_nr;
+	}
+
 	// get inode from destination directories inode number
 	dir_inode = testfs_get_inode(sb, inode_nr);
 	if (testfs_inode_get_type(dir_inode) != I_DIR) {

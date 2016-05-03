@@ -21,15 +21,22 @@ data_block_start = 192
 
 
 class Information:
-    def __init__(self, size, inode_number, inode_offset):
+    def __init__(self, size, inode_number, inode_offset, isDirectory=True):
         self.__size = size
         self.__inode_number = inode_number
         self.__inode_offset = inode_offset
-        self.__direct_blocks = set()
+        self.__direct_blocks = []
         self.__indirect_block = None
+        self.__isDirectory = isDirectory
+        self.__inode_numbers_starting_offset = set()
+
+        if self.__isDirectory:
+            assert (self.__size > 0)
+            self.__update_inode_starting_offsets(4)
+            self.__update_inode_starting_offsets(14)
 
     def addDirectBlock(self, block_number):
-        self.__direct_blocks.add(block_number)
+        self.__direct_blocks.append(block_number)
 
     def getTotalDirectBlocks(self):
         return len(self.__direct_blocks)
@@ -45,8 +52,34 @@ class Information:
         self.__updateBlocks__()
 
     def increaseSize(self, size):
+        assert self.__isDirectory
+        self.__update_inode_starting_offsets(self.__size + POINTER_SIZE - 1)
         self.__size += size
         self.__updateBlocks__()
+
+    def __update_inode_starting_offsets(self, offset):
+        # Mark the specified offset as the starting point of an inode number.
+        # struct dirent {
+        #   int d_name_len;
+        #   int d_inode_nr;
+        # };
+        self.__inode_numbers_starting_offset.add(offset)
+
+    def calculate_directory_entry_pointers(self):
+        global on_disk_pointers
+
+        if not self.__isDirectory:
+            return
+
+        # For each offset marked as the starting offset of the inode number
+        # associated with a directory entry, calculate the actual disk offset
+        # where it is stored.
+        for st_offset in sorted(self.__inode_numbers_starting_offset):
+            for disk_offset in xrange(st_offset, st_offset + POINTER_SIZE):
+                # The disk block is calculated based on the blocks that have been
+                # allocated for the specified inode.
+                disk_block = self.__direct_blocks[disk_offset / BLOCK_SIZE]
+                on_disk_pointers.add((disk_block * BLOCK_SIZE) + (disk_offset % BLOCK_SIZE))
 
     def __updateBlocks__(self):
         global data_block_start
@@ -67,7 +100,7 @@ class Information:
                 self.__indirect_block = data_block_start
                 data_block_start += 1
 
-            self.__direct_blocks.add(data_block_start)
+            self.__direct_blocks.append(data_block_start)
             data_block_start += 1
 
     def getSize(self):
@@ -84,6 +117,9 @@ class Information:
 
     def getDirectBlocks(self):
         return sorted(self.__direct_blocks)
+
+    def isDirectory(self):
+        return self.__isDirectory
 
     def __str__(self):
         return "\n\tSize: {}\n\tInode: {}\n\tInode offset: {}\n\tIndirect block: {}\n\tDatablocks: {}\n".\
@@ -110,6 +146,8 @@ def getInode():
     return inode_number, inode_offset
 
 if __name__ == "__main__":
+    # Commands to ignore.
+    commands_to_ignore = ["catr", "checkfs", "ls", "lsr"]
 
     # Initialize the current directory to be the root.
     current_directory = "/"
@@ -122,10 +160,10 @@ if __name__ == "__main__":
     directory_stack = []
 
     # The root directory contains two entries:
-    # 2 * sizeof(int) + len("./") + 1
-    # 2 * sizeof(int) + len("../") + 1
+    # 2 * sizeof(int) + len(".") + 1
+    # 2 * sizeof(int) + len("..") + 1
     root_inode_number, root_inode_offset = getInode()
-    root_info = Information(23, root_inode_number, root_inode_offset)
+    root_info = Information(21, root_inode_number, root_inode_offset)
     info_per_dir_or_file[current_directory] = root_info
 
     # Add the data block associated with the root directory.
@@ -179,7 +217,7 @@ if __name__ == "__main__":
 
                 # Calculate and store the information related to the newly created file.
                 file_inode_number, file_inode_offset = getInode()
-                file_info = Information(0, file_inode_number, file_inode_offset)
+                file_info = Information(0, file_inode_number, file_inode_offset, False)
                 info_per_dir_or_file[path_to_file] = file_info
 
                 # Make sure that the parent directory already exists.
@@ -201,10 +239,10 @@ if __name__ == "__main__":
             assert (path_to_file not in info_per_dir_or_file)
 
             # Each directory contains two entries:
-            # 2 * sizeof(int) + len("./") + 1
-            # 2 * sizeof(int) + len("../") + 1
+            # 2 * sizeof(int) + len(".") + 1
+            # 2 * sizeof(int) + len("..") + 1
             dir_inode_number, dir_inode_offset = getInode()
-            directory_info = Information(23, dir_inode_number, dir_inode_offset)
+            directory_info = Information(21, dir_inode_number, dir_inode_offset)
             info_per_dir_or_file[path_to_file] = directory_info
 
             # Add the data block associated with the newly created directory.
@@ -221,6 +259,9 @@ if __name__ == "__main__":
             # info_per_dir_or_file[path_to_parent] = parent_info
 
         elif cmd == "cd":
+            if arguments[1] == "." or arguments[1] == "./":
+                continue
+
             if arguments[1] == ".." or arguments[1] == "../":
                 # The current directory will be equal to the directory
                 # that was inserted last into the stack.
@@ -231,11 +272,17 @@ if __name__ == "__main__":
                     arguments[1] += '/'
 
                 # Make sure that the directory exists.
-                path_to_file = path_to_parent + arguments[1]
+                if arguments[1] == "/":
+                    path_to_file = arguments[1]
+                else:
+                    path_to_file = path_to_parent + arguments[1]
                 assert(path_to_file in info_per_dir_or_file)
 
                 # Add the current directory to the directory stack.
-                directory_stack.append(current_directory)
+                if arguments[1] == "/":
+                    directory_stack = []
+                else:
+                    directory_stack.append(current_directory)
 
                 # Mark the specified directory as the current directory.
                 current_directory = arguments[1]
@@ -244,8 +291,8 @@ if __name__ == "__main__":
             path_to_parent = ''.join(directory_stack) + current_directory
 
         else:
-            # The command 'catr' is acceptable.
-            if cmd == "catr" or cmd == "checkfs":
+            # Check if the specified command is acceptable.
+            if cmd in commands_to_ignore:
                 continue
 
             print "Unknown command: {}\nExiting...".format(cmd)
@@ -267,7 +314,16 @@ if __name__ == "__main__":
     total_direct_blocks = 0
     total_indirect_blocks = 0
 
+    # Calculate the number of files and directories.
+    total_files = 0
+    total_directories = 0
+
     for entry, info in info_per_dir_or_file.iteritems():
+        if info.isDirectory():
+            total_directories += 1
+        else:
+            total_files += 1
+
         # If the size of the file is larger than 4 * BLOCK_SIZE
         # then, an indirect block will be used.
         if info.getSize() > (4 * BLOCK_SIZE):
@@ -281,9 +337,8 @@ if __name__ == "__main__":
         total_direct_blocks += info.getTotalDirectBlocks()
         total_indirect_blocks += info.getTotalIndirectBlocks()
 
-        # Calculate and store all on-disk pointers.
-        # Initially, for each direct block pointer, mark the specified bytes as
-        # on-disk pointers.
+        # Calculate and store all on-disk pointers. Initially, for each
+        # direct block pointer, mark the specified bytes as on-disk pointers.
         on_disk_offset = (info.getInodeNumber() * BLOCK_SIZE) + (info.getInodeOffset() + 12)
         total_datablocks = info.getTotalDirectBlocks()
         i = 0
@@ -308,6 +363,10 @@ if __name__ == "__main__":
             for i in xrange(0, bytes_used_in_indirect_block):
                 on_disk_pointers.add(on_disk_offset + i)
 
+        # If the entry is a directory, then count the inode number of each directory
+        # entry as an on-disk pointer.
+        # info.calculate_directory_entry_pointers()
+
     # There is at least direct pointer for the '/' (root) directory.
     assert(total_direct_pointers > 5)
     assert(total_indirect_pointers == total_indirect_blocks)
@@ -323,6 +382,11 @@ if __name__ == "__main__":
     total_on_disk_pointers /= POINTER_SIZE
     assert (total_on_disk_pointers == (total_direct_pointers + total_indirect_pointers))
 
+    # The following statement must be executed only if the processing script
+    # also considers inode numbers inside directory entries as on-disk pointers.
+    # assert ((total_direct_pointers + total_indirect_pointers + total_files +
+    #         (total_directories * 3) - 1) == total_on_disk_pointers)
+
     print "Statistics:"
     if args.VERBOSE:
         width = 25
@@ -333,15 +397,14 @@ if __name__ == "__main__":
 
             print "{}".format(str(info))
 
-    print "  -- Total inodes: {}".format(total_inodes)
-    print "  -- Total direct blocks: {}".format(total_direct_blocks)
-    print "  -- Total indirect blocks: {}".format(total_indirect_blocks)
-    print "  -- Total direct pointers: {}".format(total_direct_pointers)
-    print "  -- Total indirect pointers: {}".format(total_indirect_pointers)
-    print "  -- Total pointers: {}".format(total_direct_pointers + total_indirect_pointers)
+    print "  -- Total on-disk pointers: {}".format(total_on_disk_pointers)
 
     if args.VERBOSE:
-        print "  -- Total on-disk pointers: {}".format(total_on_disk_pointers)
+        print "  -- Total inodes: {}".format(total_inodes)
+        print "  -- Total directories: {}".format(total_directories)
+        print "  -- Total files: {}".format(total_files)
+        print "  -- Total direct blocks: {}".format(total_direct_blocks)
+        print "  -- Total direct pointers: {}".format(total_direct_pointers)
+        print "  -- Total indirect blocks: {}".format(total_indirect_blocks)
+        print "  -- Total indirect pointers: {}".format(total_indirect_pointers)
         print "  -- On-disk pointers: {}".format(sorted(on_disk_pointers))
-        print "  -- On-disk pointers: {}".format(len(on_disk_pointers))
-        print "  -- On-disk pointers: {}".format(len(on_disk_pointers) / 4)
