@@ -9,5 +9,6 @@ cscope.out
 tags
 
 # Testfs stuff.
+testfs/*.c
 testfs/*.bc
 testfs/*.dis

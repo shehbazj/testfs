@@ -56,7 +56,7 @@ $DIR/llvm/build/bin/llvm-link -o=$1.inst2.bc $DIR/build/libFSlice.bc $1.inst.bc
 
 # Optimize the linked file testfs.inst2.bc and call it testfs.opt.bc. 
 
-$DIR/llvm/build/bin/opt -O3 $1.inst2.bc -o $1.opt.bc
+$DIR/llvm/build/bin/opt -reg2mem $1.inst2.bc -o $1.opt.bc
 
 # Compile bc with clang that would result in creation of .o optimized file
 
