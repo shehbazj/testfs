@@ -11,6 +11,7 @@ fi
 #DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 for file in "$@"; do
+echo "Processing $file"
 
 taintLine=`head -1 $file`
 taintValue=`echo $taintLine | cut -d'=' -f1`

@@ -13,10 +13,21 @@ def V( a, b):
 def operate(op, op1, op2):
 	if op is "add":
 		return op1 + op2
-	if op is "mul":
+	elif op is "mul":
 		return op1 * op2
-	if op is "sdiv":
+	elif op is "sdiv":
 		return op1 / op2
+	elif op is "udiv":
+		return op1 / op2
+	else:
+		print "Undefined Binary Operation"
+
+def generateLabel(op,op1,op2):
+	global labelId
+	labelId+=1
+	label = "L"+str(labelId)
+	print label,op,op1,op2
+	return label
 
 def A( op, op1, op2, discard):
 	global labelId
@@ -26,12 +37,23 @@ def A( op, op1, op2, discard):
 	elif isinstance(op1,basestring) and isinstance(op2,int):
 		if op2 == 0:
 			return op1
-		labelId+=1
-		label = "L"+str(labelId)
-		print label,op,op1,op2
-		return label
+		return generateLabel(op,op1,op2)
 
+	elif ((isinstance(op1,basestring) and isinstance(op2,list)) or
+	(isinstance(op1,list) and isinstance(op2,basestring)) or
+	(isinstance(op1,list) and isinstance(op2,list))):
+		return generateLabel(op,op1,op2)
+		
+#	elif isinstance(op1,list) and isinstance(op2,basestring):
+#		return generateLabel(op,op1,op2)
+#
+#	elif isinstance(op1,list) and isinstance(op2,list):
+#		return generateLabel(op,op1,op2)
+		
 	elif isinstance(op1,list) and isinstance(op2, int):
+		if op2 == 0:
+			return op1
+		#print op,op1,op2
 		mylist = []
 		mylist.append(op)
 		mylist.append('B')
@@ -44,7 +66,7 @@ def A( op, op1, op2, discard):
 		print label,mylist
 		return label
 	else:
-		print "No case matched"
+		print "No case matched for",op,op1,op2
 		return []
 
 # returns list containing all indexes block number and block taint
