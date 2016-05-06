@@ -18,7 +18,7 @@ numBlocks=$3
 # if no arg specified, use equal file sized distribution
 fileDistribution=${4:-0}
 
-echo "FILE DISTRIBUTION $fileDistribution"
+
 TOTAL_BYTES=$(($numBlocks * 64))
 for i in `seq 1 $TOTAL_BYTES`; do
 	byte_string="$byte_string$((i%10))"

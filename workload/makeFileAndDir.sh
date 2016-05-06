@@ -14,13 +14,13 @@ numFile=$2
 if [[ $numDir -le 3 || $numFile -le 3 ]]; then
 
 	# create directories
-	for i in seq `1 $numDir`; do
-		mkdir dir$i
+	for i in `seq 1 $numDir`; do
+		echo "mkdir dir$i"
 	done
 
 	# create files
-	for i in seq `1 $numFile`; do
-		touch file$i
+	for i in `seq 1 $numFile`; do
+		echo "touch file$i"
 	done
 else
 	# create two level directory with 1 file i.e. dir1/dir1_2/file1

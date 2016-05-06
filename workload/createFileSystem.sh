@@ -22,8 +22,9 @@ numDataBlock=$(($((percent * $DBLOCK))/100))
 numDir=$((numInode / 2))
 numFile=$((numInode / 2))
 
+rm workload.$percent
 # echo "percent $percent, numInode = $numInode, numDataBlock = $numDataBlock"
-./makeFileAndDir.sh $numDir $numFile
-./generateData.sh $numDir $numFile $numDataBlock $distribution
+./makeFileAndDir.sh $numDir $numFile >> workload.$percent
+./generateData.sh $numDir $numFile $numDataBlock $distribution >> workload.$percent
 
 exit 0
