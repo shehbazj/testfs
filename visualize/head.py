@@ -136,7 +136,7 @@ class A(Base):
 
 
 class O(Base):
-    def __init__(self, taintID, *bytes):
+    def __init__(self, garbage, taintID, *bytes):
         Base.__init__(self, taintID)
         self.bytes = bytes
         self.size = len(self.bytes)

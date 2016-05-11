@@ -5,9 +5,9 @@
 12288:8:char * 
 12296:2:char * 
 12298:8:char * 
-12306:3:char * 
+12306:3:char *
 4128:32:struct dinode 
 12288:8:char * 
 12296:2:char * 
-12298:8:char * 
+12298:8:char *
 12306:3:char *

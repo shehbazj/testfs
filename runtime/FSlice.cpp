@@ -149,7 +149,8 @@ static Taint Load(uint64_t addr, uint64_t size) {
   Taint t = {gId++, 0, false};
 #endif
   auto sep = ",";
-  std::cerr << "t" << t.id << "=O(" << t.id;
+//  std::cerr << "t" << t.id << "=O(" << t.id;
+  std::cerr << "t" << t.id << "=O(t" << gShadow[addr].id << "," << t.id;
   for (auto i = 0U; i < size; ++i) {
     const auto mt = gShadow[addr + i];
     std::cerr << sep << "t" << mt.id << "[" << mt.offset << "]";
@@ -274,6 +275,7 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
     gShadow[daddr + i] = {bt.id, bt.offset, false};
   }
 //  std::cerr << "#DSTRUCT:"<< "Addr=" << gShadow[daddr].phy_addr << ":Size|" << size << std::endl;
+  std::cerr << "#DSTRUCT:"<< "t=" << gShadow[daddr].id << "O=" <<gShadow[daddr].offset << ":Size|" << size << std::endl;
   //__fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize all gArgs. intialize gRet to 0,0,false
   __fslice_store_ret({0,0,false}); // initialize all gArgs. intialize gRet to 0,0,false
   return memmove(dst, src, size);
