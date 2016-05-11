@@ -43,9 +43,8 @@ cat template/head.py template/body.py >> templates/$file.py
 # 1 - retain variables
 blockNumber=`echo $file | cut -d'.' -f1`
 python templates/$file.py > classifier/$file.template
-head -n -1 classifier/$file.template > classifier/all_lines_except_last
-cksum classifier/all_lines_except_last | cut -d' ' -f1 >> classifier/$blockNumber
-rm classifier/$file.template
+numLines=`wc -l classifier/$file.template | cut -d" " -f1`
+sed -i "$numLines s/B$blockNumber/BC/g" classifier/$file.template
+cksum classifier/$file.template | cut -d' ' -f1 >> classifier/$blockNumber
+#rm classifier/$file.template
 done
-
-rm classifier/all_lines_except_last
