@@ -12,7 +12,6 @@
 #include <sstream>
 #include <algorithm>
 
-#define NON_TAGGED_PHY_ADDR 999999
 // Attribute packed is for space compaction. Any object instance created for Taint 
 // requires exactly 64 bits. If packed was not used, each attribute of the structure
 // would take 4 bytes.
@@ -33,7 +32,6 @@ struct Taint {
   uint64_t offset:31;	// S.J. number of bytes following the address that 
 			// have the same taint value as start address.
   bool is_obj:1;	// S.J. Is true for objects allocated on heap
-//	uint64_t phy_addr;
 } __attribute__((packed));
 
 struct SaveErrno {
@@ -56,7 +54,6 @@ struct SaveErrno {
 #define MEM false
 
 static Taint gArgs[16] = {{0,0,false}};
-//static Taint gArgs[16] = {{0,0,false,NON_TAGGED_PHY_ADDR}};
 static Taint gReturn = {0,0,false};
 //static Taint gReturn = {0,0,false,NON_TAGGED_PHY_ADDR};
 
@@ -164,10 +161,6 @@ static Taint Load(uint64_t addr, uint64_t size) {
 // If the address is already tainted. Print it.
 // If not, add a taint value to the address.
 
-// addr and phy_addr in Taint t are different
-// addr is in memory address. phy_addr is the 
-// address on disk
-
 static void Store(uint64_t addr, uint64_t size, Taint t) {
   SaveErrno save_errno;
   std::cerr << "# Invoking Store(" << addr << ", " << size << ", "
@@ -180,12 +173,6 @@ static void Store(uint64_t addr, uint64_t size, Taint t) {
                 << "[" << (t.offset + i) << "] # Store::is_obj equals true."
                 << std::endl;
     } else {
-//        if(t.phy_addr == NON_TAGGED_PHY_ADDR)
-//      	  //et = {t.id, t.offset + i, false, NON_TAGGED_PHY_ADDR}; // should be `taint.offset + i`?
-//      	  et = {t.id, t.offset + i, false}; // should be `taint.offset + i`?
-//
-//        else
-      	  //et = {t.id, t.offset + i, false, t.phy_addr + i}; // should be `taint.offset + i`?
       	  et = {t.id, t.offset + i, false}; // should be `taint.offset + i`?
     }
   }
@@ -216,7 +203,6 @@ LOAD_STORE(64)
 extern "C" Taint __fslice_load_ret(void) {
   memset(gArgs, 0, sizeof gArgs);
   const auto t = gReturn;
-  //gReturn = {0,0,false,NON_TAGGED_PHY_ADDR};
   gReturn = {0,0,false};
   return t;
 }
@@ -225,7 +211,6 @@ extern "C" Taint __fslice_load_ret(void) {
 
 extern "C" void __fslice_store_ret(Taint taint) {
   memset(gArgs, 0, sizeof gArgs);
-  //gReturn = {taint.id, taint.offset, false, taint.phy_addr};
   gReturn = {taint.id, taint.offset, false};
 }
 
@@ -233,7 +218,6 @@ extern "C" void __fslice_store_ret(Taint taint) {
 
 extern "C" Taint __fslice_load_arg(uint64_t i) {
   const auto t = gArgs[i];
-  //gArgs[i] = {0,0,false,NON_TAGGED_PHY_ADDR};
   gArgs[i] = {0,0,false};
   return t;
 }
@@ -241,7 +225,6 @@ extern "C" Taint __fslice_load_arg(uint64_t i) {
 // store tainted value in gArgs ordered list.
 
 extern "C" void __fslice_store_arg(uint64_t i, Taint taint) {
-  //gArgs[i] = {taint.id, taint.offset, false, taint.phy_addr};
   gArgs[i] = {taint.id, taint.offset, false};
 }
 
@@ -252,10 +235,8 @@ extern "C" void *__fslice_memset(void *dst, int val, uint64_t size) {
 					// into t, and then initialize gArgs[1] to 0,0,false.
   const auto daddr = reinterpret_cast<uint64_t>(dst);
   for (auto i = 0U; i < size; ++i) {
-      //gShadow[daddr + i] = {t.id, t.offset + i, false, NON_TAGGED_PHY_ADDR};
       gShadow[daddr + i] = {t.id, t.offset + i, false};
   }                                       // daddr+ size with taint id t.
-  //__fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // gReturn is initialized with {0,0,false}
   __fslice_store_ret({0,0,false}); // gReturn is initialized with {0,0,false}
 	return memset(dst, val, size);          // initialize the address with val.
 					// the main purpose why memset was called!
@@ -271,12 +252,9 @@ extern "C" void *__fslice_memmove(void *dst, const void *src, uint64_t size) {
   const auto saddr = reinterpret_cast<uint64_t>(src);
   for (auto i = 0U; i < size; ++i) {
     const auto bt = gShadow[saddr + i];
-    //gShadow[daddr + i] = {bt.id, bt.offset, false,bt.phy_addr + i};
     gShadow[daddr + i] = {bt.id, bt.offset, false};
   }
-//  std::cerr << "#DSTRUCT:"<< "Addr=" << gShadow[daddr].phy_addr << ":Size|" << size << std::endl;
-  std::cerr << "#DSTRUCT:"<< "t=" << gShadow[daddr].id << "O=" <<gShadow[daddr].offset << ":Size|" << size << std::endl;
-  //__fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize all gArgs. intialize gRet to 0,0,false
+  std::cerr << "#DSTRUCT:"<< "t" << gShadow[daddr].id << "," <<gShadow[daddr].offset << ":Size|" << size << std::endl;
   __fslice_store_ret({0,0,false}); // initialize all gArgs. intialize gRet to 0,0,false
   return memmove(dst, src, size);
 }
@@ -293,10 +271,8 @@ extern "C" char *__fslice_strcpy(char *dst, const char *src) {
 extern "C" void __fslice_bzero(void *dst, uint64_t size) {
   const auto daddr = reinterpret_cast<uint64_t>(dst);
   for (auto i = 0U; i < size; ++i) {
-    //gShadow[daddr + i] = {0,0,false,NON_TAGGED_PHY_ADDR};
     gShadow[daddr + i] = {0,0,false};
   }
-//  __fslice_store_ret({0,0,false,NON_TAGGED_PHY_ADDR}); // initialize gArgs as false. initialize gReturn as false
   __fslice_store_ret({0,0,false}); // initialize gArgs as false. initialize gReturn as false
   memset(dst, 0, size);
 }
@@ -304,17 +280,14 @@ extern "C" void __fslice_bzero(void *dst, uint64_t size) {
 extern "C" void *__fslice_malloc(uint64_t size) {
   auto ptr = calloc(1, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
-  //Taint t = {gId++, 0,false,NON_TAGGED_PHY_ADDR};
   Taint t = {gId++, 0,false};
 
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ")" << std::endl;
 
   for (auto i = 0U; i < size; ++i) {
-    //gShadow[addr + i] = {t.id, i, MEM, t.phy_addr}; // MEM -treat heap allocated objects as separate objects
     gShadow[addr + i] = {t.id, i, MEM}; // MEM -treat heap allocated objects as separate objects
   }					// by default it is false.
-  //__fslice_store_ret({0,0,false, NON_TAGGED_PHY_ADDR});	// init gArgs list and gReturn with 0,0,false
   __fslice_store_ret({0,0,false});	// init gArgs list and gReturn with 0,0,false
   return ptr;
 }
@@ -322,17 +295,14 @@ extern "C" void *__fslice_malloc(uint64_t size) {
 extern "C" void *__fslice_calloc(uint64_t num, uint64_t size) {
   auto ptr = calloc(num, size);
   const auto addr = reinterpret_cast<uint64_t>(ptr);
-  //Taint t = {gId++, 0,false, NON_TAGGED_PHY_ADDR};
   Taint t = {gId++, 0,false};
   std::cerr << "t" << t.id << "=M(" << size << ", " << MEM << ", " << t.id
 			<< ",t" << __fslice_load_arg(0).id << ",t"
             << __fslice_load_arg(1).id << ")" << std::endl;
 
   for (auto i = 0U; i < num * size; ++i) {
-    //gShadow[addr + i] = {t.id, i, MEM, t.phy_addr};
     gShadow[addr + i] = {t.id, i, MEM};
   }
-//  __fslice_store_ret({0,0,false, NON_TAGGED_PHY_ADDR});	// init gArgs list and gReturn with 0,0,false
   __fslice_store_ret({0,0,false});	// init gArgs list and gReturn with 0,0,false
   return ptr;
 }
@@ -343,7 +313,6 @@ extern "C" Taint __fslice_value(uint64_t val) {
 #if VALUE_CACHE
 	auto &t = gValues[val];
 	if (/*val && */ !t.id) {
-		//t = { gId++, 0, false, NON_TAGGED_PHY_ADDR };
 		t = { gId++, 0, false};
 		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # "
 				<< TaintAsString(t) << std::endl;
@@ -352,7 +321,6 @@ extern "C" Taint __fslice_value(uint64_t val) {
 	return t;
 #else
 	/*if (val) { */
-		//Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
 		Taint t = {gId++, 0, false};
 		std::cerr << "t" << t.id << "=V(" << val << ", " << t.id << ")" << " # " << TaintAsString(t) << std::endl;
 		return t;
@@ -371,13 +339,11 @@ extern "C" Taint __fslice_op2(const char *op, Taint t1, Taint t2) {
   const auto id = t1.id | (static_cast<uint64_t>(t2.id) << 32);
   auto &t = gBinaryOps[op][id];
   if (!t.id) {
-    //t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
     t = {gId++, 0, false};
     std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
               << ",t" << t2.id << ", " << t.id << ")" << std::endl;
   }
 #else
-  //Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   Taint t = {gId++, 0, false};
   std::cerr << "t" << t.id << "=A(\"" << op << "\",t" << t1.id
             << ",t" << t2.id << ", " << t.id << ")" << std::endl;
@@ -392,7 +358,6 @@ extern "C" Taint __fslice_op2(const char *op, Taint t1, Taint t2) {
 
 static Taint GetBlock(uint64_t size, uint64_t nr) {
 	Taint t = { 0, 0, false};
-//	Taint t = { 0, 0, false, NON_TAGGED_PHY_ADDR };
 #if BLOCKS_CACHE
 	t = gBlocks[nr];
 #endif
@@ -405,7 +370,6 @@ static Taint GetBlock(uint64_t size, uint64_t nr) {
 		std::cerr << "t" << t.id << "=B(" << size << "," << nr << ",t" << st.id
 				<< ",t" << nt.id << ", " << t.id << ") # GetBlock(" << size
 				<< ", " << nr << ")" << std::endl;
-		//__fslice_store_ret( { 0, 0, false, NON_TAGGED_PHY_ADDR});
 		__fslice_store_ret( { 0, 0, false});
 	} else {
 		std::cerr << "# Block " << nr << " is already tainted as: t" << t.id
@@ -477,13 +441,11 @@ extern "C" void __fslice_write_block(uint64_t addr, uint64_t size, uint64_t nr) 
 
 extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
-  //Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   Taint t = {gId++, 0, false};
   std::cerr << "t" << t.id << "=N(" << len << ", " << t.id << ")"
 			<< std::endl;
 
   for (auto i = 0U; i < len; ++i) {
-    //gShadow[addr + i] = {t.id, i, false, t.phy_addr};
     gShadow[addr + i] = {t.id, i, false};
   }
 }
@@ -494,7 +456,6 @@ extern "C" void __fslice_name(uint64_t addr, uint64_t len) {
 // generated for all accessed data.
 extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
   SaveErrno save_errno;
-  //Taint t = {gId++, 0, false, NON_TAGGED_PHY_ADDR};
   Taint t = {gId++, 0, false};
   std::cerr << "t" << t.id << "=D(" << len << ", " << t.id << ")"
 			<< std::endl;
@@ -505,8 +466,7 @@ extern "C" void __fslice_data(uint64_t addr, uint64_t len) {
       std::cerr << "t" << t.id << "[" << i << "]=t" << bt.id
                 << "[" << bt.offset << "]" << std::endl;
     }
-//    bt = {t.id, i, false, t.phy_addr};	// XXX unsure about non_tagged_phy_addr
-    bt = {t.id, i, false};	// XXX unsure about non_tagged_phy_addr
+    bt = {t.id, i, false};
   }
 }
 
