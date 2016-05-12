@@ -13,7 +13,7 @@ fi
 
 TRACE_FILE=/tmp/testfs.py
 BLOCK_SIZE=64
-PROCESSING_DIR=trace
+DEST_DIR=backtrace
 BNUM_TAINT_FILE=bnum_taint_file
 
 if [[ ! -f $TRACE_FILE ]]; then
@@ -26,11 +26,10 @@ if [[ -f $BNUM_TAINT_FILE ]]; then
 	touch $BNUM_TAINT_FILE
 fi
 
-if [[ -d $PROCESSING_DIR ]]; then
-	rm -rf $PROCESSING_DIR
+if [[ -d $DEST_DIR ]]; then
+	rm -rf $DEST_DIR
 fi
-
-mkdir $PROCESSING_DIR
+mkdir $DEST_DIR
 
 filename=""
 # stores (block_number, taint_for_block_number)
@@ -43,9 +42,9 @@ createBlockVisualizeFile() {
 	blockTaint=`echo "$bnum_taint_tuple" | cut -d" " -f2`
 	echo "processing for blockNumber $blockNumber and blockTaint $blockTaint"
 	
-	fileBack=$PROCESSING_DIR/$blockNumber\.$blockTaint\.back   # temporary file name, contains backtrace of block
-	fileReverse=$PROCESSING_DIR/$blockNumber\.$blockTaint\.reverse   # temporary file name, contains reverse of block backtrace
-	fileName=$PROCESSING_DIR/$blockNumber\.$blockTaint\.visualize   # valid python visualize file
+	fileBack=$DEST_DIR/$blockNumber\.$blockTaint\.back   # temporary file name, contains backtrace of block
+	fileReverse=$DEST_DIR/$blockNumber\.$blockTaint\.reverse   # temporary file name, contains reverse of block backtrace
+	fileName=$DEST_DIR/$blockNumber\.$blockTaint\.visualize   # valid python visualize file
 
 	python ../trace.py -b $blockTaint $TRACE_FILE > $fileBack
 
