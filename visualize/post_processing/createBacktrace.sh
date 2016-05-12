@@ -11,7 +11,7 @@ if [[ $# -eq 0 ]]; then
 	echo "Processing with default TRACE_FILE - /tmp/testfs.py"
 fi
 
-TRACE_FILE=/tmp/testfs.py
+TRACE_FILE=${1:-/tmp/testfs.py}
 BLOCK_SIZE=64
 DEST_DIR=backtrace
 BNUM_TAINT_FILE=bnum_taint_file
