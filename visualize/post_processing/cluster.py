@@ -1,5 +1,9 @@
 #!/usr/bin/python
 
+# Cluster.py takes a bunch of files which have a list of checksums inside them, and merges the files if one or more checksums in
+# either of the files matches. By default, the program takes all files from the folder cksums and then merges files
+
+
 import sys
 import shutil
 import os
@@ -26,7 +30,16 @@ def getNextFile():
 	
 if __name__ == "__main__":
     """ Main Start """
-allFiles=sys.argv[1:len(sys.argv)]
+if len(sys.argv) > 1:
+	allFiles=sys.argv[1:len(sys.argv)]
+else:
+	src_files=os.listdir("cksums")
+	dest="."
+	for file_name in src_files:
+    		full_file_name = os.path.join("cksums", file_name)
+    		if (os.path.isfile(full_file_name)):
+        		shutil.copy(full_file_name, dest)
+			allFiles.insert(len(allFiles),file_name)
 #print allFiles
 
 #print "f1 returned",f1

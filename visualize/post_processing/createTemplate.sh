@@ -46,12 +46,12 @@ for file in $FILES; do
 	taintValue=`echo $taintLine | cut -d'=' -f1`
 	
 	#echo "global removeConstants" > template/body.py
-	rm $WORKING_DIR/templateBaseFunctions/body.py
-	echo "removeConstants=$removeConstants" >> $WORKING_DIR/templateBaseFunctions/body.py
-	tac $file >> $WORKING_DIR/templateBaseFunctions/body.py
+	rm $WORKING_DIR/baseTemplateFunctions/body.py
+	echo "removeConstants=$removeConstants" >> $WORKING_DIR/baseTemplateFunctions/body.py
+	tac $file >> $WORKING_DIR/baseTemplateFunctions/body.py
 	
 	# Create a temporary Python file to process the generated tainted operations.
-	cat $WORKING_DIR/templateBaseFunctions/head.py $WORKING_DIR/templateBaseFunctions/body.py >> $WORKING_DIR/prenormalize/$file.py
+	cat $WORKING_DIR/baseTemplateFunctions/head.py $WORKING_DIR/baseTemplateFunctions/body.py >> $WORKING_DIR/prenormalize/$file.py
 	#echo "print $taintValue" >> template/$1.py
 	
 	# 0 - place variables as constants.

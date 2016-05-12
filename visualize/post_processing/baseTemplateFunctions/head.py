@@ -42,6 +42,7 @@ def A( op, op1, op2, discard):
 
 	elif isinstance(op1,basestring) and isinstance(op2,int):
 		if op2 == 0:
+			#print op1
 			return op1
 		return generateLabel(op,op1,op2)
 
@@ -51,8 +52,9 @@ def A( op, op1, op2, discard):
 		return generateLabel(op,op1,op2)
 		
 	elif isinstance(op1,list) and isinstance(op2, int):
-		if op2 == 0:
-			return op1
+		#if op2 == 0:
+		#	print "returning ",op1
+		#	return op1
 		#print op,op1,op2
 		mylist = []
 		mylist.append(op)
