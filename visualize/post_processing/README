@@ -28,13 +28,14 @@ Once we have the taint trace, we normalize the backtrace for each of the blocks.
 
 where something* is a label
 
-Relevant Steps 
-./normalise.sh /tmp/testfs.py 
-[OPTIONAL] ./cleanup_trace.sh <taint.number>
-# deletes all backtraces before certain taint number. useful if we want to remove initialization taints
-./createTemplate.sh *.back 
-# creates templates that have constants replaced by a literal 'C'. all operations are simplified, calculated and templates are generated. Also the destination block number is replaced by a 'C', this is so that similar templates do not appear different while clustering
-#it then creates a cksum of each template, and writes these checksums to their respective block number files.
+Relevant Scripts
+
+1) ./createBacktrace.sh /tmp/testfs.py 
+
+[OPTIONAL] ./cleanup_trace.sh <taint.number> # deletes all backtraces before certain taint number. useful if we want to remove initialization taints
+
+2) ./createTemplate.sh *.back  
+# creates templates that have constants replaced by a literal 'C'. all operations are simplified, calculated and templates are generated. Also the destination block number is replaced by a 'C', this is so that similar templates do not appear different while clustering. It then creates a cksum of each template by calling computeTemplateCksum.sh, and writes these checksums to their respective block number files.
 
 B) CLUSTERING
 ./cluster.py <block_number_files>
