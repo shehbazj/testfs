@@ -4,8 +4,11 @@
 
 file=$1
 blockNumber=$2
+removeConstants=$3
 numLines=`wc -l ../templates/$file.template | cut -d" " -f1`
-sed -i "$numLines s/B$blockNumber/BC/g" ../templates/$file.template
+if [[ $removeConstants == True ]]; then
+	sed -i "$numLines s/B$blockNumber/BC/g" ../templates/$file.template
+fi
 cksum ../templates/$file.template | cut -d' ' -f1 >> ../cksums/$blockNumber
 #rm classifier/$file.template
 

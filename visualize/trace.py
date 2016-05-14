@@ -14,8 +14,8 @@ if __name__ == "__main__":
 
         relevant_lines = []
         flag = None
-	printFunctionNames = None
-	#printFunctionNames = True
+	#printFunctionNames = None
+	printFunctionNames = True
 
         # Forward pass
         if args.b:
