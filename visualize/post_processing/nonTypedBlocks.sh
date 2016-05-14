@@ -8,18 +8,33 @@ rm blockTaints operations
 
 cat $TAINT_FILE | grep "B(64," | cut -d"=" -f1 >> blockTaints
 
+cat $TAINT_FILE | grep "B(64," | cut -d"," -f2 >> blockNumbers
+
+paste -d" " blockTaints blockNumbers > TaintBlockFile
+
+declare -A taintBlockHash
+
+while read line; do
+	taint=`echo $line | cut -d" " -f1`
+	blockNum=`echo $line | cut -d" " -f2`
+	taintBlockHash[$taint]=$blockNum
+done < TaintBlockFile
+
 cat $TAINT_FILE | cut -d"=" -f2 >> operations
 
-while read operations ;do
-	while read taint; do
-#		echo $operation $taint
-#		#echo $taint
-		blockTaintStr=$taint"["
-#		echo $blockTaintStr
-		if [[ $operations != *$blockTaintStr* ]]; then
-			echo "mismatch"
-		else
-			echo "$taint" > 	
+while read taint; do
+	blockTaintStr=$taint"["
+	flag=1
+	while read operations; do
+		if [[ $operations == *$blockTaintStr* ]]; then
+			echo "$operations contains $blockTaintStr"
+			flag=0
+			#break	
 		fi
-	done < blockTaints
-done < operations
+	done < operations
+	if [[ $flag -eq 0 ]]; then
+		echo ${taintBlockHash[$taint]}
+	else
+		echo "flag is false"
+	fi
+done < blockTaints
