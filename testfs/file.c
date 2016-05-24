@@ -17,7 +17,7 @@ int cmd_cat(struct super_block *sb, struct context *c) {
 	}
 
 	for (i = 1; ret == 0 && i < c->nargs; i++) {
-		inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, c->cmd[i]);
+		inode_nr = testfs_dir_name_to_inode_nr(sb, &c->cur_dir, c->cmd[i]);
 		if (inode_nr < 0)
 			return inode_nr;
 		in = testfs_get_inode(sb, inode_nr);
@@ -68,7 +68,7 @@ int cmd_catr(struct super_block *sb, struct context *c) {
 	/* Get the inode number that corresponds to the provided
 	 * directory name. If no directory name is specified, search
 	 * for the current directory. */
-	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, cdir);
+	inode_nr = testfs_dir_name_to_inode_nr(sb, &c->cur_dir, cdir);
 	if (inode_nr < 0)
 		return inode_nr;
 
@@ -132,7 +132,7 @@ int cmd_write(struct super_block *sb, struct context *c) {
 	filename = c->cmd[1];
 	content = c->cmd[2];
 
-	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, filename);
+	inode_nr = testfs_dir_name_to_inode_nr(sb, &c->cur_dir, filename);
 	if (inode_nr < 0)
 		return inode_nr;
 	in = testfs_get_inode(sb, inode_nr);
@@ -175,7 +175,7 @@ int cmd_owrite(struct super_block *sb, struct context *c) {
 	if(offset < 0)
 		return -EINVAL;
 
-	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, filename);
+	inode_nr = testfs_dir_name_to_inode_nr(sb, &c->cur_dir, filename);
 	if (inode_nr < 0)
 		return inode_nr;
 	in = testfs_get_inode(sb, inode_nr);
@@ -222,7 +222,7 @@ int cmd_oread(struct super_block *sb, struct context *c) {
 	if(size == 0)
 		return ret;
 
-	inode_nr = testfs_dir_name_to_inode_nr(c->cur_dir, c->cmd[1]);
+	inode_nr = testfs_dir_name_to_inode_nr(sb, &c->cur_dir, c->cmd[1]);
 	if (inode_nr < 0)
 		return inode_nr;
 
