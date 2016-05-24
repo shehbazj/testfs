@@ -14,6 +14,9 @@ allFiles = []
 def commonCksum(f1,f2):
 	cksum1 = set(open(f1,'r'))
 	cksum2 = set(open(f2,'r'))
+#	if cksum1.issubset(cksum2) or cksum2.issubset(cksum1):
+#		return True
+#	return False
 	if cksum1.isdisjoint(cksum2):
 		return False
 	return True
@@ -33,6 +36,7 @@ if __name__ == "__main__":
 if len(sys.argv) > 1:
 	allFiles=sys.argv[1:len(sys.argv)]
 else:
+# copy all files from cksums folder to current directory
 	src_files=os.listdir("cksums")
 	dest="."
 	for file_name in src_files:

@@ -7,7 +7,7 @@ WORKING_DIR=`pwd`
 SRC_DIR=`pwd`/backtrace
 PREPROCESS_DIR=`pwd`/prenormalize
 DEST_DIR=`pwd`/templates
-FILES=${1:-*.back}
+FILES=${@:-*.back}
 
 if [ -d $PREPROCESS_DIR ]; then
 	rm -rf $PREPROCESS_DIR
@@ -24,6 +24,7 @@ mkdir $DEST_DIR
 # the variable replaces all constants with character 'C'
 # useful for standardising templates
 removeConstants=True
+#removeConstants=False
 
 # Prints the full path of the current directory.
 #DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
@@ -33,8 +34,10 @@ fi
 
 mkdir cksums
 
-if [ $# -eq 1 ]; then
-	cp $1 $SRC_DIR
+if [ $# -gt 1 ]; then
+	for file in $@; do
+		cp $file $SRC_DIR
+	done
 fi
 
 cd $SRC_DIR
@@ -58,5 +61,5 @@ for file in $FILES; do
 	# 1 - retain variables
 	blockNumber=`echo $file | cut -d'.' -f1`
 	python $WORKING_DIR/prenormalize/$file.py > $WORKING_DIR/templates/$file.template
-	$WORKING_DIR/computeTemplateCksum.sh $file $blockNumber
+	$WORKING_DIR/computeTemplateCksum.sh $file $blockNumber $removeConstants
 done
