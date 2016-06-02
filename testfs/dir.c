@@ -23,9 +23,14 @@ testfs_next_dirent(struct inode *dir, int *offset)
 
 	assert(dir);
 	assert(testfs_inode_get_type(dir) == I_DIR);
+
 	// check size of the directory with offset
 	if (*offset >= testfs_inode_get_size(dir))
 		return NULL;
+
+	/* Make sure a struct dirent entry does not span multiple blocks. */
+	if((((*offset) + sizeof(struct dirent)) / BLOCK_SIZE) > ((*offset) / BLOCK_SIZE))
+		(*offset) = (((*offset) + sizeof(struct dirent)) / BLOCK_SIZE) * BLOCK_SIZE;
 
 	// read data from dir into buffer "d" at offset-offset of size struct dirent
 	// dirent contains inode number and name length value
@@ -33,7 +38,16 @@ testfs_next_dirent(struct inode *dir, int *offset)
 	if (ret < 0)
 		return NULL;
 
-	assert(d.d_name_len > 0);
+	// assert(d.d_name_len > 0);
+	if(d.d_name_len == 0) {
+		/* The next entry is located inside the next block allocated for this directory. */
+		(*offset) = (((*offset) / BLOCK_SIZE) + 1) * BLOCK_SIZE;
+
+		ret = testfs_read_data(dir, *offset, (char *) &d, sizeof(struct dirent));
+		if (ret < 0)
+			return NULL;
+	}
+
 	dp = malloc(sizeof(struct dirent) + d.d_name_len);
 	if (!dp)
 		return NULL;
@@ -90,8 +104,8 @@ static int testfs_write_dirent(struct inode *dir, char *name, int len,
 		int inode_nr, int offset) 
 {
 	int ret;
-	struct dirent *d = malloc(sizeof(struct dirent) + len);
-
+	int total_bytes = sizeof(struct dirent) + len;
+	struct dirent *d = malloc(total_bytes);
 	if (!d)
 		return -ENOMEM;
 
@@ -99,7 +113,30 @@ static int testfs_write_dirent(struct inode *dir, char *name, int len,
 	d->d_name_len = len;
 	d->d_inode_nr = inode_nr;
 	_strcpy(D_NAME(d), name);
-	ret = testfs_write_data(dir, offset, (char *) d, sizeof(struct dirent) + len);
+
+	/* Make sure a struct dirent entry does not span multiple blocks. In case the new dirent
+	 * does not fit inside the current block, we fill the current block with zeroes and update
+	 * the offset to point at the next available offset. */
+	if(((offset + total_bytes) / BLOCK_SIZE) > (offset / BLOCK_SIZE)) {
+		int next_offset = ((offset + total_bytes) / BLOCK_SIZE) * BLOCK_SIZE;
+		int total = next_offset - offset;
+		char *buf = malloc(total);
+
+		if(!buf)
+			return -ENOMEM;
+
+		memset(buf, 0, total);
+		ret = testfs_write_data(dir, offset, buf, total);
+		free(buf);
+
+		if(ret < 0)
+			return ret;
+
+		/* Update the current offset. */
+		offset = next_offset;
+	}
+
+	ret = testfs_write_data(dir, offset, (char *) d, total_bytes);
 	free(d);
 	return ret;
 }
@@ -312,6 +349,11 @@ static int testfs_create_file_or_dir(struct super_block *sb, struct context *c, 
 			name_to_create = name + name_offset + 1;
 		}
 	}
+
+	/* Make sure that the specified name does not exceed the size of one block. */
+	if(name_to_create != NULL)
+		if(strlen(name_to_create) + 1 > BLOCK_SIZE - sizeof(struct dirent))
+			return -EINVAL;
 
 	testfs_tx_start(sb, TX_CREATE);
 	if (c) {
