@@ -3,7 +3,6 @@
  * See bitmap.h for more information.
  */
 
-#include "fslice.h"
 #include <errno.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -45,7 +44,7 @@ int bitmap_create(u_int32_t nbits, struct bitmap **bp) {
 		return -ENOMEM;
 	}
 
-	_bzero(b->v, words * sizeof(WORD_TYPE));
+	bzero(b->v, words * sizeof(WORD_TYPE));
 	b->nbits = nbits;
 
 	/* Mark any leftover bits at the end in use */

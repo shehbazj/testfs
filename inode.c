@@ -5,8 +5,6 @@
 #include "list.h"
 #include "csum.h"
 
-#include "fslice.h"
-
 /* inode flags */
 #define I_FLAGS_DIRTY     0x1
 
@@ -230,7 +228,7 @@ struct inode *testfs_get_inode(struct super_block *sb, int inode_nr)
 	block_offset = testfs_inode_to_block_offset(in);
 	// copy inode disk contents from block+block_offset 
 	// into sb->in structure
-	_memcpy(&in->in, block + block_offset, sizeof(struct dinode));
+	memcpy(&in->in, block + block_offset, sizeof(struct dinode));
 	// insert in into in memory hash map
 	inode_hash_insert(in);
 	return in;
@@ -244,7 +242,7 @@ void testfs_sync_inode(struct inode *in)
 	assert(in->i_flags & I_FLAGS_DIRTY);
 	testfs_read_inode_block(in, block);
 	block_offset = testfs_inode_to_block_offset(in);
-	_memcpy(block + block_offset, &in->in, sizeof(struct dinode));
+	memcpy(block + block_offset, &in->in, sizeof(struct dinode));
 	testfs_write_inode_block(in, block);
 	in->i_flags &= ~I_FLAGS_DIRTY;
 }
@@ -300,7 +298,7 @@ void testfs_remove_inode(struct inode *in)
 {
 	testfs_truncate_data(in, 0);
 	/* zero the inode */
-	_bzero(&in->in, sizeof(struct dinode));
+	bzero(&in->in, sizeof(struct dinode));
 	in->i_flags |= I_FLAGS_DIRTY;
 	testfs_put_inode_freemap(in->sb, in->i_nr);
 	testfs_sync_inode(in);
@@ -341,7 +339,7 @@ int testfs_read_data(struct inode *in, int start, char *buf, const int size)
 			// later it becomes an aligned value (b_offset = 0)
 			copy_size = BLOCK_SIZE - b_offset;
 		}
-		_memcpy(buf + buf_offset, block + b_offset, copy_size);
+		memcpy(buf + buf_offset, block + b_offset, copy_size);
 		buf_offset += copy_size;
 		b_offset = 0;
 	} while (!done);
@@ -360,7 +358,7 @@ int testfs_write_data(struct inode *in, int start, char *buf, const int size)
 	int buf_offset = 0; /* src offset in buf for copy */
 	int done = 0;
 
-	fslice_data(buf, size);
+	//fslice_data(buf, size);
 
 	assert(buf);
 	assert(start <= in->in.i_size);
@@ -384,7 +382,7 @@ int testfs_write_data(struct inode *in, int start, char *buf, const int size)
 		} else {
 			copy_size = BLOCK_SIZE - b_offset;
 		}
-		_memcpy(block + b_offset, buf + buf_offset, copy_size);
+		memcpy(block + b_offset, buf + buf_offset, copy_size);
 		csum = testfs_calculate_csum(block, BLOCK_SIZE);
 		write_blocks(in->sb, block, block_nr, 1);
 		testfs_put_csum(in->sb, block_nr, csum);

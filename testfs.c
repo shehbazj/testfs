@@ -6,7 +6,6 @@
 #include "inode.h"
 #include "dir.h"
 #include "tx.h"
-#include "fslice.h"
 
 static int cmd_help(struct super_block *, struct context *c);
 static int cmd_quit(struct super_block *, struct context *c);
@@ -176,7 +175,6 @@ int main(int argc, char * const argv[])
 	// read from the disk. after successful execution, we have 
 	// sb initialized to dsuper_block read from disk.
 	ret = testfs_init_super_block(args->disk, args->corrupt, &sb);
-	//fslice_clear();	
 	if (ret) {
 		EXIT("testfs_init_super_block");
 	}

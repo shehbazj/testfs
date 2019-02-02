@@ -5,8 +5,6 @@
 #include "dir.h"
 #include "tx.h"
 
-#include "fslice.h"
-
 // S.J. reads the directory entry in a directory inode dir.
 // updates the inode offset to point to the next directory entry
 // in the inode.
@@ -93,7 +91,7 @@ static int testfs_write_dirent(struct inode *dir, char *name, int len,
 	assert(inode_nr >= 0);
 	d->d_name_len = len;
 	d->d_inode_nr = inode_nr;
-	_strcpy(D_NAME(d), name);
+	strcpy(D_NAME(d), name);
 	ret = testfs_write_data(dir, offset, (char *) d,
 			sizeof(struct dirent) + len);
 	free(d);
@@ -117,7 +115,6 @@ static int testfs_add_dirent(struct inode *dir, char *name, int inode_nr)
 	int len = strlen(name) + 1;
 	// newly created file and directories will have there
 	// name recorded.
-	fslice_name(name, len);
 
 	assert(dir);
 	assert(testfs_inode_get_type(dir) == I_DIR);
